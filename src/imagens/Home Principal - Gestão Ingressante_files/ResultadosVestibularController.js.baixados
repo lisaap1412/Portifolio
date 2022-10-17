@@ -1,0 +1,46 @@
+﻿app.controller('ResultadosVestibularController', ['$scope', 'VestibularService', function ($scope, VestibularService) {
+
+    /*$('#quickmenuInscricaoVestibular').hide();*/
+    $('.sem-resultados').hide();
+    $('.resultados').hide();
+
+    $scope.getResultadosProcessoSeletivo = function () {
+        VestibularService.getResultadosProcessoSeletivo(data.inscricaoVestibular).then(function (result) {
+            if (result.Success) {
+                if (result.Data.MostrarResultado) {
+
+                    $('.sem-resultados').hide();
+                    $('.resultados').show();
+
+                    $scope.resultados = result.Data.Resultados;
+                    $scope.provas = result.Data.Provas;
+
+                    $scope.matricula = result.Data.Matricula;
+                    if ($scope.matricula == null) {                     //Candidato ainda não possui VST_DadosMatricula.
+                        $scope.matriculaIniciadaSite = false;
+                    } else {
+                        if ($scope.matricula.StatusMatricula == 83) {   //Candidato possui VST_DadosMatricula com StatusMatricula = 83 - Preenchimento de dados.
+                            $scope.matriculaIniciadaSite = false;
+                        } else {
+                            $scope.matriculaIniciadaSite = true;        //Candidato possui VST_DadosMatricula com StatusMatricula # 83 - Preenchimento de dados.
+                        }
+                    };
+
+                    $scope.InscricaoVestibular = $scope.resultados.InscricaoVestibular;
+                } else {
+                    $('.sem-resultados').show();
+                    $('.resultados').hide();
+                }
+            } else {
+                if (result.ErrorMessage) {
+                    alert(result.ErrorMessage);
+                }
+            }
+        });
+    }
+
+    $scope.carregarModalMatriculaDesativada = function () {
+        $('#modalMatriculaDesativada').modal('show');
+    };
+
+}]);

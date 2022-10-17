@@ -1,0 +1,138 @@
+﻿app.controller('ContaController', ['$rootScope', '$scope', '$location', 'ContaService', 'CloakService', '$window',
+function ($rootScope, $scope, $location, ContaService, CloakService, $window) {
+
+    $scope.initPaginaLogin = function () {
+        $rootScope.pageTitle = "Página de Autenticação";
+        $scope.TipoCredencialID = 1;
+        $scope.Email = undefined;
+        $scope.chbAcessoEmailInatel = true;
+        $scope.grpGrupoEmailAuntenticacao = false;
+        $scope.chbEsconderAcessoEmailParticular = window.Model == null;
+
+        if (window.Model != null) {
+            $scope.TipoEmail = 'Não';
+            $scope.Email = window.Model.Email;
+            $scope.Senha = window.Model.Senha;
+            $scope.ConfirmaSenha = window.Model.ConfirmaSenha;
+            $scope.DataNascimento = window.Model.DataNascimento;
+            $scope.lnkEsconderInformacao = window.Model.lnkEsconderInformacao;
+            $scope.grpGrupoEmailAuntenticacao = true;
+            $scope.TokenCredencial = window.Model.TokenCredencial;
+            $scope.EmailCorrente = window.Model.EmailCorrente;
+            $scope.CodigoAcesso = window.Model.CodigoAcesso;
+            $scope.Nome = window.Model.Nome;
+            $scope.CPF = window.Model.CPF;
+            $scope.Nacionalidade = window.Model.Nacionalidade;
+        }
+    };
+
+    
+
+
+    $scope.InitAcessoPendente = function () {
+        $scope.Monitoracao = {};
+        var token = location.search.split('token=')[1];
+        VerificarAutorizacaoAcesso(token);
+
+    }
+
+
+    $scope.VerificarTipoEmail = function () {
+        if (!$scope.Email)
+            alert("Digite seu email.");
+        else
+            if (!$scope.Email.includes("@"))
+                alert("Digite um email válido.")
+            else {
+                if (!$scope.Email.includes("inatel.br"))
+                    $scope.chbEsconderAcessoEmailParticular = false;
+                else {
+                    $scope.chbEsconderAcessoEmailParticular = true;
+                    window.location.href = "../Conta/LoginSaml"     ;
+                }
+
+                $scope.chbAcessoEmailInatel = !$scope.chbEsconderAcessoEmailParticular;
+                $scope.grpGrupoEmailAuntenticacao = true;
+            }
+    }
+
+
+    $scope.EnviarAutorizacaoAcessoEmail = function () {
+        var token = location.search.split('token=')[1];
+
+        ContaService.EnviarAutorizacaoAcessoEmail(token).then(function (result) {
+            console.log(result.Data);
+            alert(result.Data.Mensagem);
+            window.location.href = "../Conta/AcessoPendente?token=" + result.Data.TokenAcesso;
+        }, function (errorAutorizacaoAcesso) {
+            $scope.Monitoracao.Mensagem = errorAutorizacaoAcesso.ErrorMessage;
+            $scope.Monitoracao.EsconderMensagemErro = false;
+        });
+    }
+
+    $scope.initPaginaRegistro = function () {
+
+        if (window.Model != null) {
+            $scope.Email = window.Model.Email;
+            $scope.Senha = window.Model.Senha;
+            $scope.Nome = window.Model.Nome;
+            $scope.CPF = window.Model.CPF;
+            $scope.DataNascimento = window.Model.DataNascimento;
+            $scope.Senha = window.Model.Senha;
+            $scope.ConfirmaSenha = window.Model.ConfirmaSenha;
+        }
+    }
+
+    $scope.ClickTipoEmail = function (value) {
+        $scope.chbEsconderAcessoEmailParticular = value == 'I';
+        $scope.chbAcessoEmailInatel = !$scope.chbEsconderAcessoEmailParticular;
+    };
+
+    $scope.EnviarSenhaPorEmail = function () {
+        ContaService.validarEnvioSenha($scope.EmailEsquecimento, $scope.DataNascimento).then(function () {
+            ContaService.EnviarSenhaPorEmail($scope.EmailEsquecimento, $scope.DataNascimento, $scope.responseCapcha).then(function (result) {
+                toastr["success"](result.Data);
+                $('#modal-Informacao').modal('hide');
+                grecaptcha.reset(0);
+            }, function (errorValidarRealizarLogin) {
+                alert(errorValidarRealizarLogin.ErrorMessage);
+                $('#modal-Informacao').modal('hide');
+                grecaptcha.reset(0);
+            });
+        }, function (errorValidarRealizarLogin) {
+            alert(errorValidarRealizarLogin);
+        });
+    };
+
+    $scope.MostrarModalEsquciMinhaSenha = function () {
+        $scope.responseCapcha = grecaptcha.getResponse();
+
+        if ($scope.responseCapcha.length == 0)
+            alert("Marque primeiro a opção 'Não sou um robô'.")
+        else
+            $('#modal-Informacao').modal('show');
+    };
+
+
+    $scope.MostrarModalAlteracaoSenha = function () {
+        $('#modal-Informacao').modal('show');
+    };
+
+    $scope.AlteracaoSenhaSistema = function () {
+        ContaService.validarAlteracaoSenha($scope.AntigaSenha, $scope.NovaSenha, $scope.ConfirmacaoSenha).then(function () {
+            ContaService.AlteracaoSenhaSistema($scope.AntigaSenha, $scope.NovaSenha, $scope.ConfirmacaoSenha).then(function (result) {
+                toastr["success"](result.Data);
+                $('#modal-Informacao').modal('hide');
+                $scope.AntigaSenha = "";
+                $scope.NovaSenha = "";
+                $scope.ConfirmacaoSenha = "";
+            });
+        }, function (errorValidarRealizarLogin) {
+            alert(errorValidarRealizarLogin);
+        });
+    };
+
+} ]);
+
+
+

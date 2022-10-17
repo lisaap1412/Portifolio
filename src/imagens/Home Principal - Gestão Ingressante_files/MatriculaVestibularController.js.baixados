@@ -1,0 +1,584 @@
+﻿//app.controller('MatriculaVestibularController', ['$scope', 'VestibularService', '$q', '$upload', function ($scope, VestibularService, $q, UploadBase) {
+app.controller('MatriculaVestibularController', ['$scope', 'VestibularService', '$q', '$upload', '$mdConstant', function ($scope, VestibularService, $q, UploadBase, $mdConstant) {
+
+    $scope.mascaraCEP = '99999-999';
+    $scope.responsavel = {
+        Nacionalidade: 1
+    };
+    $scope.erros = [];
+    $scope.dadosMatricula = {};
+    $scope.Pagina = 1;
+
+    $("a.scrollToTop").on('click', function (event) {
+        event.preventDefault();
+        $('html,body').animate({
+            scrollTop: 0
+        }, 500);
+    });
+
+    $scope.documentos = [];
+    $scope.habilitarProximaPagina = false;
+    $scope.faseMatricula = 0;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //1ª fase da matricula: informaçações financeiras e upload de documentos através da página de resultados do vestibular.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+    $scope.carregarModalFormasDePagamento = function () {
+        $('#modalFormasDePagamento').modal('show');
+    };
+
+    $scope.carregarModalSegurado = function () {
+        $('#modalSobreSegurado').modal('show');
+    };
+
+    $scope.changeBoletoCep = function () {
+        if ($scope.responsavel.BoletoCep) {
+            VestibularService.getCidadePorCEPFinanceiro($scope.responsavel.BoletoCep).then(function (result) {
+                $scope.cidadesBoleto = result.Data.Cidades;
+                if (result.Data.CidadeSelecionada == null) {
+                    $scope.responsavel.BoletoEstado = 0;
+                    $scope.responsavel.BoletoCidade = 0;
+                } else {
+                    $scope.responsavel.BoletoEstado = result.Data.CidadeSelecionada.Estado;
+                    $scope.responsavel.BoletoCidade = result.Data.CidadeSelecionada.Handle;
+                }
+            });
+        }
+    };
+
+    $scope.changeBoletoUf = function () {
+        VestibularService.getCidadesDoEstadoFinanceiro($scope.responsavel.BoletoEstado).then(function (result) {
+            $scope.cidadesBoleto = result.Data;
+        });
+    };
+
+    $scope.changeCEP = function () {
+        if ($scope.responsavel.CEP) {
+            VestibularService.getCidadePorCEPFinanceiro($scope.responsavel.CEP).then(function (result) {
+                $scope.cidades = result.Data.Cidades;
+                if (result.Data.CidadeSelecionada == null) {
+                    $scope.responsavel.Estado = 0;
+                    $scope.responsavel.Cidade = 0;
+                } else {
+                    $scope.responsavel.Estado = result.Data.CidadeSelecionada.Estado;
+                    $scope.responsavel.Cidade = result.Data.CidadeSelecionada.Handle;
+                }
+            });
+        }
+    };
+
+    $scope.changeCriarAcessoResponsavel = function () {
+        if ($scope.responsavel.CriarAcessoResponsavel == false) {
+            $scope.responsavel.ResponsavelAcademico = null;
+            $scope.responsavel.ResponsavelEmail = null;
+            $scope.erros = [];
+        }
+    };
+
+    $scope.changeFormaDePagamento = function () {
+        $scope.erros = [];
+    };
+
+    $scope.changeSeguradoEhContratante = function () {
+        if ($scope.responsavel.SeguradoEhContratante == true) {
+            $scope.responsavel.Segurado = null;
+            $scope.responsavel.SeguradoNascimento = null;
+            $scope.responsavel.SeguradoCPF = null;
+            $scope.responsavel.SeguradoEmail = null;
+            $scope.erros = [];
+        }
+    };
+
+    $scope.changeUF = function () {
+        VestibularService.getCidadesDoEstadoFinanceiro($scope.responsavel.Estado).then(function (result) {
+            $scope.cidades = result.Data;
+        });
+    };
+
+    $scope.fecharModalFormasDePagamento = function () {
+        $('#modalFormasDePagamento').modal('hide');
+    };
+     
+    $scope.fecharModalSegurado = function () {
+        $('#modalSobreSegurado').modal('hide');
+    };
+
+    //Página MatriculaDadosFinanceiros.cshtml.
+    $scope.getDadosMatricula = function () {
+        //$scope.nomeInscrito = data.nomeInscrito;        //--> perdendo as configurações de acentuação.
+        $scope.numeroInscricao = data.numeroInscricao;
+        //$scope.descricaoCurso = data.descricaoCurso;    //--> perdendo as configurações de acentuação.
+        $scope.handleCurso = data.handleCurso;
+        //$scope.cpfInscrito = data.cpfInscrito;
+        //$scope.handleResultado = data.handleResultado;
+        $scope.GUID = data.GUID;
+
+        VestibularService.getInformacoesResponsavelFinanceiro($scope.numeroInscricao).then(function (result) {
+            if (result.Success) {
+                if (result.Data.DadosMatricula != null) {
+                    $scope.responsavel = result.Data.DadosMatricula;
+                    $scope.responsavel.Curso = $scope.handleCurso;
+                    //$scope.responsavel.ResultadoHandle = $scope.handleResultado;
+                    $scope.responsavel.GUID = $scope.GUID;
+                    if ($scope.responsavel.Estado) { $scope.changeUF() };
+                    if ($scope.responsavel.BoletoEstado) { $scope.changeBoletoUf() };
+                    $scope.operacao = 2;    //Alteração.
+                } else {
+                    VestibularService.getUsuarioVestibularPelaInscricao($scope.numeroInscricao).then(function (result) {
+                        if (result.Success) {
+                            $scope.responsavel.Inscrito = result.Data.Handle;
+                            $scope.responsavel.Deficiente = result.Data.Deficiente;
+                            $scope.responsavel.Curso = $scope.handleCurso;
+                            //$scope.responsavel.ResultadoHandle = $scope.handleResultado;
+                            $scope.responsavel.GUID = $scope.GUID;
+                            $scope.responsavel.SeguradoEhContratante = true;
+                            $scope.responsavel.StatusMatricula = 83; //Preenchimento de dados.
+                            $scope.operacao = 1;    //1=Inclusão.
+                        } else {
+                            if (result.ErrorMessage) {
+                                alert(result.ErrorMessage);
+                            }
+                        }
+                    });
+                }
+                $scope.paises = result.Data.Paises;
+                $scope.estados = result.Data.Estados;
+                $scope.grausParentesco = result.Data.GrausParentesco;
+                $scope.estadosCivis = result.Data.EstadosCivis;
+                $scope.camisetas = result.Data.Camisetas;
+                $scope.formasPagamento = result.Data.FormasDePagamento;
+            } else {
+                if (result.ErrorMessage) {
+                    alert(result.ErrorMessage);
+                }
+            }
+        });
+    }
+
+    //Página MatriculaUploadDocumentos.cshtml.
+    $scope.getDocumentosMatricula = function () {
+        //$scope.nomeInscrito = data.nomeInscrito;        //--> perdendo as configurações de acentuação.
+        $scope.numeroInscricao = data.numeroInscricao;
+        $scope.faseMatricula = 1;
+
+        VestibularService.getUsuarioVestibularPelaInscricao($scope.numeroInscricao).then(function (result) {
+            if (result.Success) {
+                $scope.nomeInscrito = result.Data.Nome;
+                $scope.cpfInscrito = result.Data.CPF;
+                
+                VestibularService.getInformacoesResponsavelFinanceiro($scope.numeroInscricao).then(function (result) {
+                    if (result.Success) {
+                        $scope.responsavel = result.Data.DadosMatricula;
+                        ValidaDocumentosObrigatorios();
+                    } else {
+                        if (result.ErrorMessage) {
+                            alert(result.ErrorMessage);
+                        }
+                    }
+                });
+            } else {
+                if (result.ErrorMessage) {
+                    alert(result.ErrorMessage);
+                }
+            }
+        });
+    }
+
+    $scope.limparFormularioResponsavelFinanceiro = function () {
+        if (confirm("Você está prestes a limpar os dados preenchidos nessa página. O processo não poderá ser desfeito.")) {
+
+            if ($scope.Pagina == 1) {
+                $scope.responsavel.InscritoNome = null;
+                $scope.responsavel.InscritoCamiseta = null;
+                $scope.responsavel.CriarAcessoResponsavel = false;
+                $scope.responsavel.ResponsavelAcademico = null;
+                $scope.responsavel.ResponsavelEmail = null;
+            }
+
+            if ($scope.Pagina == 2) {
+                $scope.responsavel.ResponsavelFinanceiro = null;
+                $scope.responsavel.GrauParentesco = null;
+                $scope.responsavel.DataNascimento = null;
+                $scope.responsavel.EstadoCivil = null;
+                $scope.responsavel.Nacionalidade = 1;
+                $scope.responsavel.Profissao = null;
+                $scope.responsavel.CPF = null;
+                $scope.responsavel.RG = null;
+                $scope.responsavel.Email = null;
+                $scope.responsavel.Logradouro = null;
+                $scope.responsavel.Numero = null;
+                $scope.responsavel.Complemento = null;
+                $scope.responsavel.Bairro = null;
+                $scope.responsavel.CEP = null;
+                $scope.responsavel.Estado = null;
+                $scope.responsavel.Cidade = null;
+                $scope.responsavel.SeguradoEhContratante = true;
+                $scope.responsavel.Segurado = null;
+                $scope.responsavel.SeguradoNascimento = null;
+                $scope.responsavel.SeguradoCPF = null;
+                $scope.responsavel.SeguradoEmail = null;
+            }
+
+            if ($scope.Pagina == 3) {
+                $scope.responsavel.FormaDePagamento = null;
+                $scope.responsavel.TabEnderecoRemessa = null;
+                $scope.responsavel.BoletoLogradouro = null;
+                $scope.responsavel.BoletoNumero = null;
+                $scope.responsavel.BoletoComplemento = null;
+                $scope.responsavel.BoletoBairro = null;
+                $scope.responsavel.BoletoCep = null;
+                $scope.responsavel.BoletoEstado = null;
+                $scope.responsavel.BoletoCidade = null;
+            }
+
+            $scope.erros = [];
+        }
+    };
+
+    $scope.posicionarPaginaSobreErro = function () {
+        var elementoParaPosicionar = $("#grupo" + $scope.erros.min('Grupo'));
+        $('html, body').animate({
+            scrollTop: elementoParaPosicionar.offset().top - elementoParaPosicionar.height()
+        });
+    };
+
+    $scope.submitDadosMatricula = function () {
+        $scope.erros = $scope.validaMatriculaPorPagina();
+        if ($scope.erros.length == 0) {
+            if ($scope.Pagina == 1) {
+                if ($scope.responsavel.CriarAcessoResponsavel == true && $scope.responsavel.ResponsavelEmail) {
+                    VestibularService.validarMatriculaPagina1($scope.responsavel).then(function (result) {
+                        if (result.Data.length > 0) {
+                            for (var I = 0; I < result.Data.length; ++I) {
+                                var item = result.Data[I];
+                                $scope.erros.push({ Grupo: item.Grupo, Para: item.Para, Descricao: item.Descricao });
+                            }
+                        } else {
+                            $scope.Pagina = 2;
+                        }
+                    }, function (mensagemErro) {
+                        alert(mensagemErro);
+                    });
+                } else {
+                    $scope.Pagina = 2;
+                }
+            } else if ($scope.Pagina == 2) {
+                VestibularService.validarMatriculaPagina2($scope.responsavel).then(function (result) {
+                    if (result.Data.length > 0) {
+                        for (var I = 0; I < result.Data.length; ++I) {
+                            var item = result.Data[I];
+                            $scope.erros.push({ Grupo: item.Grupo, Para: item.Para, Descricao: item.Descricao });
+                        }
+                    } else {
+                        $scope.erros = VestibularService.validarIdadeSegurado($scope.responsavel);
+                        if ($scope.erros.length == 0) {
+                            $scope.Pagina = 3;
+                        }
+                    }
+                }, function (mensagemErro) {
+                    alert(mensagemErro);
+                });
+            } else if ($scope.Pagina == 3) {
+                $scope.dadosMatricula = $scope.responsavel;
+
+                VestibularService.salvarDadosMatricula($scope.dadosMatricula, $scope.operacao).then(function (result) {
+                    window.location.href = "../Vestibular/MatriculaUploadDocumentos?resultado=" + $scope.responsavel.GUID;
+                });
+            }
+        }
+    }
+
+    $scope.validaMatriculaPorPagina = function () {
+        var validacao = [];
+
+        if ($scope.Pagina == 1) {
+            if (!$scope.responsavel.InscritoNome) {
+                validacao.push({ Grupo: 1, Para: 'InscritoNome', Descricao: 'Digite o nome completo do candidato.' });
+            }
+            if ($scope.responsavel.CriarAcessoResponsavel == true) {
+                if (!$scope.responsavel.ResponsavelAcademico) {
+                    validacao.push({ Grupo: 5, Para: 'ResponsavelAcademico', Descricao: 'Digite o nome do responsável.' });
+                }
+                if (!$scope.responsavel.ResponsavelEmail) {
+                    validacao.push({ Grupo: 5, Para: 'ResponsavelEmail', Descricao: 'Digite o email do responsável.' });
+                }
+            }
+        }
+        else if ($scope.Pagina == 2) {
+            if (!$scope.responsavel.ResponsavelFinanceiro) {
+                validacao.push({ Grupo: 2, Para: 'ResponsavelFinanceiro', Descricao: 'Digite o nome do contratante.' });
+            }
+            if (!$scope.responsavel.GrauParentesco) {
+                validacao.push({ Grupo: 2, Para: 'GrauParentesco', Descricao: 'Escolha o grau de parentesco do contratante com o candidato.' });
+            }
+            if (!$scope.responsavel.DataNascimento) {
+                validacao.push({ Grupo: 2, Para: 'DataNascimento', Descricao: 'Digite a data de nascimento do contratante.' });
+            }
+            if (!$scope.responsavel.EstadoCivil) {
+                validacao.push({ Grupo: 2, Para: 'EstadoCivil', Descricao: 'Escolha o estado civil do contratante.' });
+            }
+            if (!$scope.responsavel.Nacionalidade) {
+                validacao.push({ Grupo: 2, Para: 'Nacionalidade', Descricao: 'Escolha a nacionalidade do contratante.' });
+            }
+            if (!$scope.responsavel.Profissao) {
+                validacao.push({ Grupo: 2, Para: 'Profissao', Descricao: 'Digite a profissão do contratante.' });
+            }
+            if (!$scope.responsavel.CPF) {
+                validacao.push({ Grupo: 2, Para: 'CPF', Descricao: 'Digite o CPF do contratante.' });
+            }
+            if (!$scope.responsavel.RG) {
+                validacao.push({ Grupo: 2, Para: 'DocumentoIdentidade', Descricao: 'Digite o documento de identidade do contratante.' });
+            }
+            if (!$scope.responsavel.Logradouro) {
+                validacao.push({ Grupo: 3, Para: 'Endereco', Descricao: 'Digite o endereço do contratante.' });
+            }
+            if (!$scope.responsavel.Numero) {
+                validacao.push({ Grupo: 3, Para: 'Numero', Descricao: 'Digite o número do endereço do contratante.' });
+            }
+            if (!$scope.responsavel.Bairro) {
+                validacao.push({ Grupo: 3, Para: 'Bairro', Descricao: 'Digite o bairro do endereço do contratante.' });
+            }
+            if (!$scope.responsavel.CEP) {
+                validacao.push({ Grupo: 3, Para: 'CEP', Descricao: 'Digite o CEP do endereço do contratante.' });
+            }
+            if (!$scope.responsavel.Estado) {
+                validacao.push({ Grupo: 3, Para: 'UF', Descricao: 'Escolha a UF do endereço do contratante.' });
+            }
+            if (!$scope.responsavel.Cidade) {
+                validacao.push({ Grupo: 3, Para: 'Cidade', Descricao: 'Escolha a cidade do endereço do contratante.' });
+            }
+            if ($scope.responsavel.SeguradoEhContratante == false) {
+                if (!$scope.responsavel.Segurado) {
+                    validacao.push({ Grupo: 4, Para: 'Segurado', Descricao: 'Digite o nome do segurado.' });
+                }
+                if (!$scope.responsavel.SeguradoNascimento) {
+                    validacao.push({ Grupo: 4, Para: 'SeguradoNascimento', Descricao: 'Digite a data de nascimento do segurado.' });
+                }
+                if (!$scope.responsavel.SeguradoCPF) {
+                    validacao.push({ Grupo: 4, Para: 'SeguradoCPF', Descricao: 'Digite o CPF do segurado.' });
+                }
+            }
+        }
+        else if ($scope.Pagina == 3) {
+            if (!$scope.responsavel.FormaDePagamento) {
+                validacao.push({ Grupo: 6, Para: 'FormaDePagamento', Descricao: 'Digite a forma de pagamento das mensalidades a partir da 2ª parcela.' });
+            }
+            //Para FormaDePagamento = 2 - Carnê Residência.
+            if ($scope.responsavel.FormaDePagamento == 2 && !$scope.responsavel.TabEnderecoRemessa) {
+                validacao.push({ Grupo: 7, Para: 'TabEnderecoRemessa', Descricao: 'Escolha o endereço para remessa do boleto bancário.' });
+            }
+            //Para TabEnderecoRemessa = 3 - Outro.
+            if ($scope.responsavel.FormaDePagamento == 2 && $scope.responsavel.TabEnderecoRemessa == 3) {
+                if (!$scope.responsavel.BoletoLogradouro) {
+                    validacao.push({ Grupo: 7, Para: 'BoletoLogradouro', Descricao: 'Digite o endereço de remessa.' });
+                }
+                if (!$scope.responsavel.BoletoNumero) {
+                    validacao.push({ Grupo: 7, Para: 'BoletoNumero', Descricao: 'Digite o número do endereço de remessa.' });
+                }
+                if (!$scope.responsavel.BoletoBairro) {
+                    validacao.push({ Grupo: 7, Para: 'BoletoBairro', Descricao: 'Digite o bairro do endereço de remessa.' });
+                }
+                if (!$scope.responsavel.BoletoCep) {
+                    validacao.push({ Grupo: 7, Para: 'BoletoCep', Descricao: 'Digite o CEP do endereço de remessa.' });
+                }
+                if (!$scope.responsavel.BoletoEstado) {
+                    validacao.push({ Grupo: 7, Para: 'BoletoEstado', Descricao: 'Escolha a UF do endereço de remessa.' });
+                }
+                if (!$scope.responsavel.BoletoCidade) {
+                    validacao.push({ Grupo: 7, Para: 'BoletoCidade', Descricao: 'Escolha a cidade do endereço de remessa.' });
+                }
+            }
+        }
+        else {
+        }
+        return validacao;
+    };
+
+    $scope.voltarPaginaDadosMatricula = function () {
+        $scope.erros = [];
+        if ($scope.Pagina > 1) { $scope.Pagina = $scope.Pagina - 1; }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //Validação dos documentos da matrícula.
+    //1ª fase:
+    //Candidato: Histórico Escolar e Certidão de Conclusão do Ensino Médio (Handle=1), Quitação do Serviço Militar (Handle=3), RG (Handle=4), CPF (Handle=6), Título de Eleitor (Handle=8) e Certidão de Registro Civil (Handle=9).
+    //Contratante: RG (Handle=5) e CPF (Handle=7).
+    //Segurado: RG (Handle=10) e CPF (Handle=11).
+    //2ª fase:
+    //Documentos assinados pelo Candidato: Requerimento da Matrícula (Handle=30), Contrato de Matrícula (Handle=31) e Autorização de Débito Automático (Handle=32).
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ValidaDocumentosObrigatorios = function () {
+        VestibularService.getDocumentosMatricula($scope.numeroInscricao, $scope.faseMatricula).then(function (result) {
+            if (result.Success) {
+               $scope.documentos = result.Data;
+                if ($scope.documentos.length > 0) {
+                    var continuar = true;
+                } else {
+                    var continuar = false;
+                }
+
+                if ($scope.faseMatricula == 1) {
+                    for (var i = 0; i < $scope.documentos.length; i++) {
+                        if (!$scope.documentos[i].PossuiDocumentoAnexado && $scope.documentos[i].Obrigatorio) {
+                            if (i != 8 && i != 9) { //Documentos do segurado só serão exigidos se o segurado for diferente do contratante.
+                                continuar = false;
+                            } else {
+                                if ($scope.responsavel.SeguradoEhContratante == false) {    //Documentos do segurado só serão exigidos se o segurado for diferente do contratante.
+                                    continuar = false;
+                                }
+                            }
+                        };
+                    }
+                }
+                if ($scope.faseMatricula == 2) {
+                    for (var i = 0; i < $scope.documentos.length; i++) {
+                        if (!$scope.documentos[i].PossuiDocumentoAnexado && $scope.documentos[i].Obrigatorio) {
+                            continuar = false;
+                        };
+                    }
+                }
+
+                //if (!continuar) {
+                //    alert("Ainda não foram enviados todos os documentos obrigatórios.");
+                //    return;
+                //};
+                $scope.habilitarProximaPagina = continuar;
+            } else {
+                if (result.ErrorMessage) {
+                    alert(result.ErrorMessage);
+                }
+            }
+        });
+    };
+
+    $scope.onSubmitClickAnexo00 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo00.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[0], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo01 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo01.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[1], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo02 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo02.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[2], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo03 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo03.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[3], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo04 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo04.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[4], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo05 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo05.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[5], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo06 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo06.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[6], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo07 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo07.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[7], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo08 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo08.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[8], file, $scope.lfApi);
+    }
+    $scope.onSubmitClickAnexo09 = function (file) {
+        var validacaoAnexo = ValidarAtributosFile($scope.frmPrincipal.Anexo09.$error);
+        if (validacaoAnexo) {
+            alert(validacaoAnexo);
+            return;
+        }
+        PrepararUploadDocumento($scope.documentos[9], file, $scope.lfApi);
+    }
+
+    ValidarAtributosFile = function (obj) {
+        if (obj['required'])
+            return "O arquivo é requerido.";
+
+        if (obj['mimetype'])
+            return "Permitido apenas arquivos em PDF.";
+
+        if (obj['filesize'])
+            return "Arquivo muito grande (Limite de 3Mb).";
+        return null;
+    }
+
+    PrepararUploadDocumento = function (documento, file, lfApi) {
+        var dadosAnexo = { NomeArquivo: file[0].lfFileName, CPF: $scope.cpfInscrito, Inscricao: $scope.numeroInscricao, Pessoa: $scope.nomeInscrito, HandleDocumento: documento.Handle };
+        $scope.onFileSelect(file, dadosAnexo, documento, lfApi)
+    }
+
+    $scope.onFileSelect = function ($files, dadosAnexo, documento, lfApi) {
+        var deferred = $q.defer();
+        for (var i = 0; i < $files.length; i++) {
+            var $file = $files[i];
+            dadosAnexo.NomeArquivo = $file.lfFileName;
+            $scope.mdEsconderProgressAnexo = false;
+            deferred.resolve(
+                UploadBase.upload({
+                    url: urlServico.UploadDocumentoMatricula, // webapi url
+                    method: "POST",
+                    data: { DocumentoAbaris: dadosAnexo },
+                    file: $file.lfFile,
+                    progress: function (e) { }
+                }).then(
+                    function (data, status, headers, config) {
+                        //file is uploaded successfully
+                        //lfApi.removeAll();
+                        console.log("OK");
+                        documento.PossuiDocumentoAnexado = true;
+                        ValidaDocumentosObrigatorios();
+
+                    }, function (error) {
+                        console.log(error)
+                        $scope.mdEsconderProgressAnexo = true;
+                    })
+            );
+            deferred.promise;
+        }
+    }
+
+}])

@@ -1,0 +1,129 @@
+﻿app.controller('SegurancaController', ['$rootScope', '$scope', '$location', 'SegurancaService', '$window',
+	function ($rootScope, $scope, $location, SegurancaService, $window) {
+        
+		$scope.initPaginaSuperUsuario = function () {
+				$scope.UsuariosRegraAdm = [];
+				$scope.UsuariosRegraComunitario = [];
+				$scope.UsuariosRegraFinanceiro = [];
+				$scope.UsuariosRegraSecretaria = [];
+				$scope.UsuarioSelecionado = null;
+				$scope.RegraSelecionada = null;
+				$scope.NomeUsuarioSelecionado = "-";
+
+				$scope.ListaRegrasSeguranca = [];
+				$scope.ListaUsuariosSeguranca = [];
+        
+				SegurancaService.GetListarUsuariosSeguranca().then(function (result) {
+					$scope.ListaUsuariosSeguranca = result.Data.ListaUsuariosSeguranca;
+				});
+
+				$scope.AjustarAmbiente();
+
+		};
+
+		$scope.initPaginaLogarComo = function () {
+			if (window.Model != null) {
+				$scope.Email = window.Model.Email;
+				$scope.TokenCredencial = window.Model.TokenCredencial;
+				$scope.EmailCorrente = window.Model.EmailCorrente;
+				$scope.CodigoAcesso = window.Model.CodigoAcesso;
+				$scope.Nome = window.Model.Nome;
+			}
+		};
+
+		VerificarAutorizacaoAcesso = function (token) {
+			ContaService.VerificarAutorizacaoAcesso(token).then(function (result) {
+				$scope.Monitoracao = result.Data;
+
+				var elementoHtml = document.getElementById("btnAcessarSistema");
+				var elementoVerificacaoHtml = document.getElementById("btnVerificarAcesso");
+				if (result.Data.lnkAcesso) {
+					elementoHtml.href = location.origin;
+					elementoHtml.style.visibility = "visible";
+					elementoVerificacaoHtml.style.visibility = "hidden";
+				}
+				else {
+					elementoHtml.href = "javascript:void(0)";
+					$scope.Monitoracao.Mensagem = result.Data.Mensagem;
+					elementoHtml.style.visibility = "hidden";
+					elementoVerificacaoHtml.style.visibility = "visible";
+				}
+
+				$scope.Monitoracao.EsconderMensagemErro = result.Data.lnkAcesso;
+			}, function (errorAcessoPendente) {
+				$scope.Monitoracao.Mensagem = errorAcessoPendente.ErrorMessage;
+				$scope.Monitoracao.EsconderMensagemErro = false;
+			});
+		};
+
+
+        $scope.AjustarAmbiente = function () {
+            SegurancaService.GetListarUsuariosTodasRegras().then(function (result) {
+                $scope.UsuariosRegraAdm = result.Data.UsuariosRegraAdm;
+                $scope.UsuariosRegraComunitario = result.Data.UsuariosRegraComunitario;
+                $scope.UsuariosRegraDocente = result.Data.UsuariosRegraDocente;
+                $scope.UsuariosRegraFinanceiro = result.Data.UsuariosRegraFinanceiro;
+                $scope.UsuariosRegraSecretaria = result.Data.UsuariosRegraSecretaria;
+                $scope.ListaRegrasSeguranca = result.Data.ListaRegrasSeguranca;
+            });
+	    };
+
+	    $scope.clickSelecionarRegra = function (regra,usuario) {
+	        $scope.UsuarioSelecionado = usuario;
+	        $scope.RegraSelecionada = regra;
+	    };
+
+
+	    $scope.clickInformacaoUsuario = function () {
+	        $scope.InformacoesUsuario = "";
+	        $scope.NomeUsuarioSelecionado = "-";
+	        if( $scope.UsuarioSelecionado != undefined )
+	        {
+	            SegurancaService.GetInformacoesUsuario($scope.UsuarioSelecionado).then(function (result) {
+	                $scope.InformacoesUsuario = result.Data;
+	                $scope.NomeUsuarioSelecionado = $scope.UsuarioSelecionado;
+	            });
+	            
+	        }
+	    };
+
+	    $scope.AlterarRegra = function (anAcao) {
+	        if ($scope.UsuarioSelecionado == undefined) {
+	            alert("O usuario é obrigatório.")
+	            return;
+	        };
+
+	        if ($scope.RegraSelecionada == undefined) {
+	            alert("A regra é obrigatória.")
+	            return;
+	        };
+
+	        SegurancaService.AlterarRegraUsuario($scope.UsuarioSelecionado, $scope.RegraSelecionada, anAcao).then(function (result) {
+	            $scope.AjustarAmbiente();
+	            $scope.UsuarioSelecionado = undefined;
+	            $scope.NomeUsuarioSelecionado = "-";
+	            $scope.InformacoesUsuario = undefined;
+	        });
+
+		};
+
+		$scope.SalvarLogarComo = function (anEmail, anCodigoAcesso) {
+			var model = {};
+			model.CodigoAcesso = anCodigoAcesso;
+			model.EmailLogarComo = anEmail;
+			model.Email = $scope.Email;
+			SegurancaService.SalvarLogarComo(model).then(function (result) {
+				$scope.EmailCorrente = result.Data.EmailCorrente;
+				$scope.Nome = result.Data.Nome;
+				$scope.EmailLogarComo = undefined;
+				$scope.CodigoAcesso = undefined;
+				toastr["success"]("Dados Alterados com sucesso");
+				//window.location.href = "/GestaoIngressante?returnUrl=" + new Date().getTime();
+				window.location.href = "/GestaoIngressante";
+			});
+		};
+ 
+
+	} ]);
+
+

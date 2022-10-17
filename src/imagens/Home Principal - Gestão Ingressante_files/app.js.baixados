@@ -1,0 +1,216 @@
+﻿"use strict";
+var app = angular.module('GestaoIngressante', [
+	'ngRoute', 'ngResource', 'ngMessages', 'ngSanitize', 'ngMaterial', 
+	'ui.mask', 'ui.bootstrap', 'ui.calendar', 'angularMoment', 'angularFileUpload', 'ngRoute', 'lfNgMdFileInput'
+]);
+
+app.constant('angularMomentConfig', {
+    preprocess: 'utc',
+    timezone: 'America/Sao_Paulo'
+});
+
+
+
+app.config(['$routeProvider', '$locationProvider', '$provide', '$httpProvider',
+	function ($routeProvider, $locationProvider, $provide, $httpProvider) {
+
+		$locationProvider.hashPrefix('');
+
+		$routeProvider
+			.when('/', { templateUrl: urlPagina.PaginaInicial, controller: 'HomePrincipalController', pageTitle: 'Home Principal' })
+			.when('/Conta/Perfil', { templateUrl: urlPagina.PerfilUsuario, controller: 'ContaController', pageTitle: 'Perfil do Usuário' })
+			.when('/Seguranca/Index', { templateUrl: urlPagina.Seguranca, controller: 'SegurancaController', pageTitle: 'Segurança' })
+			.when('/Seguranca/LogarComo', { templateUrl: urlPagina.LogarComo, controller: 'SegurancaController', pageTitle: 'Logar Como' })
+			.when('/Seguranca/ContaUsuario', { templateUrl: urlPagina.SegurancaContaUsuario, controller: 'SegurancaController', pageTitle: 'Conta de Usuário' })
+			.when('/Seguranca/SuperUsuario', { templateUrl: urlPagina.SegurancaSuperUsuario, controller: 'SegurancaController', pageTitle: 'Super Usuário' })
+			.when('/Seguranca/RemoverUsuario', { templateUrl: urlPagina.SegurancaRemoverUsuario, controller: 'SegurancaController', pageTitle: 'Super Usuário' })
+
+			.when('/Vestibular/FichaInscricao', { templateUrl: urlPagina.InscricaoVestibular, controller: 'InscricaoVestibularController', pageTitle: 'Ficha de Inscrição do Vestibular' })
+			.when('/FichaSocial/Index', { templateUrl: urlPagina.FichaSocialIndex, controller: 'FichaSocialController', pageTitle: 'Ficha Social' })
+			.when('/FichaSocial/FichaInscricao', { templateUrl: urlPagina.FichaSocial, controller: 'FichaSocialController', pageTitle: 'Ficha Social' })
+            .when('/FichaSocial/FichaInscricao/:param', { templateUrl: urlPagina.FichaSocial, controller: 'FichaSocialController', pageTitle: 'Ficha Social' })
+			/*.when('/Vestibular/InscricaoConcluida/:inscricaoVestibular', { templateUrl: urlPagina.InscricaoConcluida, controller: 'InscricaoVestibularController', pageTitle: 'Inscrição Concluída' })*/
+			.otherwise({
+				redirectTo: '/'
+			});
+
+		$httpProvider.interceptors.push(['$q', '$location', function ($q, $location) {
+			return {
+				request: function (config) {
+					$('#loading').show();
+
+					config.headers = config.headers || {};
+					return config || $q.when(config);
+				},
+
+				requestError: function (rejection) {
+					$('#loading').hide();
+					return $q.reject(rejection);
+				},
+
+				response: function (response) {
+					$('#loading').hide();
+					return response || $q.when(response);
+				},
+
+				responseError: function (rejection) {
+					$('#loading').hide();
+					if (rejection.status === 401) {
+						$q.reject(rejection);
+						$location.path('/Conta/Login');
+					} else {
+						return $q.reject(rejection);
+					}
+				}
+			}
+		}]);
+	}
+]);
+
+
+Array.prototype.clear = function () {
+	while (this.length) {
+		this.pop();
+	}
+};
+
+Array.prototype.hasErrorFor = function (property) {
+	var hasError = false;
+	for (var I = 0; I < this.length; ++I) {
+		if (this[I].For == property) {
+			hasError = true;
+			break;
+		}
+	}
+	return hasError;
+};
+
+Array.prototype.find = function (prop, val) {
+	if (val == undefined) {
+		return;
+	}
+	var retval = null;
+	for (var I = 0; I < this.length; ++I) {
+
+		var p = this[I];
+		var props = prop.split('.');
+		for (var Y = 0; Y < props.length; ++Y) {
+			if (p) {
+				p = p[props[Y]];
+			}
+		}
+
+		if (p === val) {
+			retval = this[I];
+			break;
+		}
+	}
+	return retval;
+};
+
+Array.prototype.findAll = function (prop, val) {
+	var retval = [];
+
+	if (Array.isArray(val)) {
+		for (var I = 0; I < this.length; ++I) {
+			var p = this[I];
+			if (val.indexOf(p[prop]) != -1) {
+				retval.push(p);
+			}
+		}
+	} else {
+		for (var I = 0; I < this.length; ++I) {
+			var p = this[I];
+			if (p[prop] == val) {
+				retval.push(p);
+			}
+		}
+	}
+
+	return retval;
+};
+
+Array.prototype.findAllNot = function (prop, val) {
+	var retval = [];
+
+	if (Array.isArray(val)) {
+		for (var I = 0; I < this.length; ++I) {
+			var p = this[I];
+			if (val.indexOf(p[prop]) == -1) {
+				retval.push(p);
+			}
+		}
+	} else {
+		for (var I = 0; I < this.length; ++I) {
+			var p = this[I];
+			if (p[prop] != val) {
+				retval.push(p);
+			}
+		}
+	}
+
+	return retval;
+};
+
+Array.prototype.remove = function (values) {
+	for (var I = 0; I < values.length; ++I) {
+		var value = values[I];
+		var index = this.indexOf(value);
+		this.splice(index, 1);
+	}
+};
+
+Array.prototype.orderBy = function (prop, desc) {
+	var retval = [];
+
+	if (desc) {
+		this.sort(function (a, b) {
+			return a[prop] < b[prop];
+		});
+	} else {
+		this.sort(function (a, b) {
+			return a[prop] > b[prop];
+		});
+	}
+	return this;
+};
+
+Array.prototype.max = function (prop) {
+	return Math.max.apply(
+		Math, this.map(function (o) {
+			return o[prop];
+		})
+	);
+};
+
+Array.prototype.min = function (prop) {
+	return Math.min.apply(
+		Math, this.map(function (o) {
+			return o[prop];
+		})
+	);
+};
+
+String.prototype.toDateTime = function () {
+
+	var retval = '';
+	if (!Array.isArray(this)) {
+		if (this.toString().length == 8) {
+			retval = this.substring(0, 2) + "/" + this.substring(2, 4) + "/" + this.substring(4, 8);
+		}
+	}
+	return retval;
+};
+
+
+app.run(['$rootScope', '$location', '$http', 'UrlService',
+	function ($rootScope, $location, $http, UrlService) {
+        $rootScope.$on('$routeChangeStart', function (event, next, current) {
+        var route = (next || current);
+        $rootScope.pageTitle = route.pageTitle;
+        if (!next) {
+            $location.path('/');
+        }
+    });
+	}
+]);

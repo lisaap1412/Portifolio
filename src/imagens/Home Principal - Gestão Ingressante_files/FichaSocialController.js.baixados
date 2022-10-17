@@ -1,0 +1,1477 @@
+﻿app.controller('FichaSocialController', ['$rootScope', '$scope', '$location', '$upload', '$q', '$upload','FichaSocialService', 'CloakService', '$window', '$routeParams',
+    function ($rootScope, $scope, $location, $upload, $q,UploadBase,FichaSocialService, CloakService, $window, $routeParams) {
+
+
+
+        $scope.IniciarFichaSocial = function () {
+
+            $scope.GuidFichaSocial = $routeParams.param;
+            $scope.NomeNovoCandidato = undefined;
+            $scope.CPFNovoCandidato = undefined;
+            $scope.EsconderFicha = true;
+
+            if ($routeParams.param == undefined) 
+                $('#modal-Informacao').modal('show');
+            else
+                AcessarFicharSocial();
+
+          };
+
+        $scope.CancelarNovaFichaSocial = function () {
+            $('#modal-Informacao').modal('hide');
+            window.location.href = "/GestaoIngressante";
+        };
+
+
+        $scope.CriarNovaFichaSocial = function () {
+            $scope.CPFNovoCandidato = document.getElementById("CPFNovoCandidato").value;
+            FichaSocialService.validarNovoRegistro($scope.NomeNovoCandidato, $scope.CPFNovoCandidato).then(function () {
+                FichaSocialService.CriarFichaSocial($scope.NomeNovoCandidato, $scope.CPFNovoCandidato).then(function (result) {
+                    $('#modal-Informacao').modal('hide');
+                    $scope.EsconderFicha = false;
+                    $scope.GuidFichaSocial = result.Data.GUID;
+
+                }, function (errorCriarNovoRegistro) {
+                    $('#modal-Informacao').modal('show');
+                });
+            }, function (errorValidarNovoRegistro) {
+                alert(errorValidarNovoRegistro);
+            });
+        };
+
+        function AcessarFicharSocial() {
+            FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+
+                // Inicializando variáveis
+                InicializarVariaveis();
+
+                // Preenchendo dados da Ficha Social
+                $scope.FichaSocial = InicializarObjeto();
+                if (result.Data !== null) {
+                     $scope.FichaSocial.Handle = result.Data.Handle;
+                    $scope.FichaSocial.Nome = result.Data.Nome;
+                    $scope.FichaSocial.Email = result.Data.Email;
+                    $scope.FichaSocial.CPF = result.Data.CPF;
+                    $scope.FichaSocial.DataNascimento = result.Data.DataNascimento;
+                    $scope.FichaSocial.FamiliaPossuiBens = result.Data.FamiliaPossuiBens;
+                    $scope.FichaSocial.FaixaBens = result.Data.FaixaBens;
+                    $scope.FichaSocial.Status = result.Data.Status;
+                    $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                    $scope.FichaSocial.MsgProcessoSeletivoAtual = "";
+                    $scope.FichaSocial.AnalisadoSAE = result.Data.AnalisadoSAE;
+                    if ($scope.FichaSocial.AnalisadoSAE == 'N') { $scope.FichaSocial.AnalisadoSAE = 0; }
+                    if ($scope.FichaSocial.AnalisadoSAE == 'S') { $scope.FichaSocial.AnalisadoSAE = 1; }
+                    $scope.FichaSocial.TipoIngresso = result.Data.TipoIngresso;
+
+                    // Inicializar Documentação
+                    InicializarDocumentacao();
+
+                    // Buscar Inscrição no Processo Seletivo
+                    BuscarInscricaoProcessoSeletivo();
+
+                    // Buscar Processo Seletivo Atual
+                    BuscarProcessoSeletivoAtual();
+                }
+
+                $scope.MembrosFamilia = BuscaTodosMembrosFamilia();
+                $scope.MembroFamiliarModal = InicializarObjetoMFModal();
+
+                // Inicialização/Atualização campos HTML
+                InicializarAtualizarHTML();
+
+                // Mostra o formulário
+                $scope.EsconderFicha = false;
+            },
+                function (error) {
+                    alert(error);
+                });
+
+        }
+
+    function InicializarVariaveis() {
+        var i = 0;
+        $scope.EhRequerente = 0;
+        $scope.EhObrigatorioFaixaBens = 0;
+        $scope.EhObrigatorioRemuneracao = 0;
+        $scope.EhObrigatorioDoenca = 0;
+        $scope.NumMaxMembrosFamilia = 0;
+        $scope.FaixasBens = [];
+        $scope.GrausParentesco = [];
+        $scope.MensagemErro = "";
+        $scope.Maxpendencias = 50;
+        $scope.Pendencias = new Array($scope.Maxpendencias);
+        for (i = 0; i < $scope.Maxpendencias; i++) {
+            $scope.Pendencias[i] = new Object();
+            $scope.Pendencias[i].Descricao = null;
+            $scope.Pendencias[i].Invalido = null;
+        }
+        $scope.NumeroPendencias = 999;
+        $scope.TituloCabecalhoMembroFamiliar = "";
+
+        $scope.TituloMensagemFinal = ""
+        $scope.TipoBotaoFichaSocialOficial = -1;
+
+        $scope.upload = [];
+
+        $scope.TemInscricaoProcessoSeletivo = 0;
+        $scope.DesejaCadastrarFichaSocial = 0;
+
+        FichaSocialService.GetFaixaBens().then(function (result) {
+            $scope.FaixasBens = result.Data;
+            for (i = 0; i < $scope.FaixasBens.length; i++) {
+                if ($scope.FaixasBens[i].ValorFinal == null || $scope.FaixasBens[i].ValorFinal == 0) {
+                    $scope.FaixasBens[i].DescricaoFaixaBens = "Acima de " + converteFloatMoeda($scope.FaixasBens[i].ValorInicial);
+                } else {
+                    $scope.FaixasBens[i].DescricaoFaixaBens = "De " + converteFloatMoeda($scope.FaixasBens[i].ValorInicial) + " a " + converteFloatMoeda($scope.FaixasBens[i].ValorFinal);
+                }
+            }
+        });
+    }
+
+    function InicializarDocumentacao() {
+        $scope.DocumentoEnviado = 1;
+        $scope.NomeDocumento = "";
+        $scope.HandleDocumento = 0;
+        $scope.ConteudoHint = "";
+        $scope.NumArquivosTipoDocumento = 0;
+
+        $scope.DocumentacaoInscricao = [];
+        $scope.DocumentosEnviadosPessoaLogada = [];
+        $scope.NumTotalArquivos = 100;
+
+        FichaSocialService.GetDocumentacaoInscricao("Ordem").then(function (result) {
+            $scope.DocumentacaoInscricao = result.Data;
+            for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+                $scope.DocumentacaoInscricao[j].DocumentoJaEnviado = null;
+                $scope.DocumentacaoInscricao[j].NumeroArquivos = null;
+                $scope.DocumentacaoInscricao[j].Arquivo = null;
+                $scope.DocumentacaoInscricao[j].PathRelativo = null;
+                $scope.DocumentacaoInscricao[j].HandleArquivoDigital = null;
+            }
+
+            $scope.DocumentacaoArquivos = new Array($scope.NumTotalArquivos);
+            $scope.TotalArquivos = 0;
+
+            for (var k = 0; k < $scope.NumTotalArquivos; k++) {
+                $scope.DocumentacaoArquivos[k] = new Object;
+                $scope.DocumentacaoArquivos[k].TipoDocumento = null;
+                $scope.DocumentacaoArquivos[k].NomeDocumento = null;
+                $scope.DocumentacaoArquivos[k].Arquivo = null;
+                $scope.DocumentacaoArquivos[k].PathRelativo = null;
+                $scope.DocumentacaoArquivos[k].HandleArquivoDigital = null;
+                $scope.DocumentacaoArquivos[k].Handle = null;
+            }
+
+            $scope.DocumentacaoInscricaoHint = [];
+
+            $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+
+        });
+    }
+
+    function InicializarObjeto() {
+        $scope.FichaSocial = new Object();
+        $scope.FichaSocial.Handle = 0;
+        $scope.FichaSocial.Nome = "";
+        $scope.FichaSocial.Email = null;
+        $scope.FichaSocial.CPF = null;
+        $scope.FichaSocial.DataNascimento = null;
+        $scope.FichaSocial.FamiliaPossuiBens = null;
+        $scope.FichaSocial.FaixaBens = null;
+        $scope.FichaSocial.Status = null;
+        $scope.FichaSocial.StatusDescricao = null;
+        $scope.FichaSocial.AnalisadoSAE = 0;
+        $scope.FichaSocial.TipoIngresso = null;
+
+        return $scope.FichaSocial;
+    }
+
+    function InicializarObjetoMF(NumMaxMembrosFamilia) {
+        $scope.MembrosFamilia = new Array(NumMaxMembrosFamilia);
+        for (i = 0; i < $scope.NumMaxMembrosFamilia; i++) {
+            $scope.MembrosFamilia[i] = new Object();
+            $scope.MembrosFamilia[i].Handle = null;
+            $scope.MembrosFamilia[i].FichaSocial = null;
+            $scope.MembrosFamilia[i].Membro = null;
+            $scope.MembrosFamilia[i].Nome = "";
+            $scope.MembrosFamilia[i].CPF = "";
+            $scope.MembrosFamilia[i].Parentesco = null;
+            $scope.MembrosFamilia[i].NomeParentesco = null;
+            $scope.MembrosFamilia[i].Genero = null;
+            $scope.MembrosFamilia[i].Nascimento = null;
+            $scope.MembrosFamilia[i].NascimentoDB = null;
+            $scope.MembrosFamilia[i].Telefone = null;
+            $scope.MembrosFamilia[i].UltimaAtividade = null;
+            $scope.MembrosFamilia[i].Escolaridade = null;
+            $scope.MembrosFamilia[i].Remuneracao = "";
+            $scope.MembrosFamilia[i].RemuneracaoDB = "";
+            $scope.MembrosFamilia[i].Doenca = null;
+            $scope.MembrosFamilia[i].DespesaDoenca = "";
+            $scope.MembrosFamilia[i].DespesaDoencaDB = "";
+            $scope.MembrosFamilia[i].Status = 0;
+            $scope.MembrosFamilia[i].StatusDescricao = "";
+        }
+        return $scope.MembrosFamilia;
+    }
+
+    function InicializarObjetoMFModal() {
+        $scope.MembroFamiliarModal = new Object();
+        $scope.MembroFamiliarModal.Handle = null;
+        $scope.MembroFamiliarModal.FichaSocial = null;
+        $scope.MembroFamiliarModal.Membro = null;
+        $scope.MembroFamiliarModal.Nome = "";
+        $scope.MembroFamiliarModal.CPF = "";
+        $scope.MembroFamiliarModal.Parentesco = 0;
+        $scope.MembroFamiliarModal.NomeParentesco = null;
+        $scope.MembroFamiliarModal.Genero = 0;
+        $scope.MembroFamiliarModal.Nascimento = null;
+        $scope.MembroFamiliarModal.NascimentoDB = null;
+        $scope.MembroFamiliarModal.Telefone = null;
+        $scope.MembroFamiliarModal.UltimaAtividade = 0;
+        $scope.MembroFamiliarModal.Escolaridade = 0;
+        $scope.MembroFamiliarModal.Remuneracao = "";
+        $scope.MembroFamiliarModal.RemuneracaoDB = "";
+        $scope.MembroFamiliarModal.Doenca = 0;
+        $scope.MembroFamiliarModal.DespesaDoenca = "";
+        $scope.MembroFamiliarModal.DespesaDoencaDB = "";
+        $scope.MembroFamiliarModal.Status = 0;
+        $scope.MembroFamiliarModal.StatusDescricao = "";
+        return $scope.MembroFamiliarModal;
+    }
+
+    function InicializarAtualizarHTML() {
+
+        if (!$scope.FichaSocial)
+            return;
+
+        // Incializa/Atualiza Faixa de Bens
+        if ($scope.FichaSocial.FamiliaPossuiBens != 1) {
+            $scope.EhObrigatorioFaixaBens = 0;
+            $scope.FichaSocial.FaixaBens = null;
+        } else {
+            $scope.EhObrigatorioFaixaBens = 1;
+        }
+
+        // Incializa/Atualiza Remuneração da Última Atividade Principal
+        if ($scope.MembroFamiliarModal.UltimaAtividade == 0 || $scope.MembroFamiliarModal.UltimaAtividade == 4 || $scope.MembroFamiliarModal.UltimaAtividade == 11) {
+            $scope.EhObrigatorioRemuneracao = 0;
+            $scope.MembroFamiliarModal.Remuneracao = "";
+            document.getElementById('remuneracao').disabled = true;
+        } else {
+            $scope.EhObrigatorioRemuneracao = 1;
+            document.getElementById('remuneracao').disabled = false;
+        }
+
+        // Incializa/Atualiza Doença
+        if ($scope.MembroFamiliarModal.DespesaDoenca < 0) { $scope.MembroFamiliarModal.DespesaDoenca = "" }
+        if ($scope.MembroFamiliarModal.Doenca != 1) {
+            $scope.MembroFamiliarModal.DespesaDoenca = "";
+            $scope.MembroFamiliarModal.DespesaDoencaDB = "";
+            $scope.EhObrigatorioDoenca = 0;
+            document.getElementById('despesaDoenca').disabled = true;
+        } else {
+            $scope.EhObrigatorioDoenca = 1;
+            document.getElementById('despesaDoenca').disabled = false;
+        }
+    }
+
+    function BuscarInscricaoProcessoSeletivo() {
+        $scope.TemInscricaoProcessoSeletivo = 0;
+        $scope.DesejaCadastrarFichaSocial = 0;
+
+        $scope.InscricaoProcessoSeletivo = [];
+
+        FichaSocialService.GetInscricaoProcessoSeletivo($scope.FichaSocial.CPF).then(function (result) {
+            $scope.InscricaoProcessoSeletivo = result.Data;
+            if ($scope.InscricaoProcessoSeletivo.length > 0) { $scope.TemInscricaoProcessoSeletivo = 1; }
+            for (i = 0; i < $scope.InscricaoProcessoSeletivo.length; i++) {
+                if ($scope.InscricaoProcessoSeletivo[i].UsarFichaSocial == "S") {
+                    $scope.DesejaCadastrarFichaSocial = 1;
+                }
+            }
+        });
+    }
+
+    function BuscarProcessoSeletivoAtual() {
+        $scope.MsgProcessoSeletivoAtual = "";
+        FichaSocialService.GetProcessoSeletivoAtual().then(function (result) {
+            $scope.FichaSocial.MsgProcessoSeletivoAtual = result.Data;
+        });
+    }
+
+    function BuscaTodosMembrosFamilia() {
+        $scope.MembrosFamilia = InicializarObjetoMF($scope.NumMaxMembrosFamilia);
+        FichaSocialService.GetMembrosFamilia($scope.GuidFichaSocial).then(function (result) {
+            $scope.NumMaxMembrosFamilia = result.Data.length;
+            $scope.MembrosFamilia = InicializarObjetoMF();
+            for (i = 0; i < result.Data.length; i++) {
+                $scope.MembrosFamilia[i].Handle = result.Data[i].Handle;
+                $scope.MembrosFamilia[i].FichaSocial = result.Data[i].FichaSocial;
+                $scope.MembrosFamilia[i].Membro = result.Data[i].Membro;
+                $scope.MembrosFamilia[i].Nome = result.Data[i].Nome;
+                $scope.MembrosFamilia[i].CPF = result.Data[i].CPF;
+                $scope.MembrosFamilia[i].Parentesco = result.Data[i].Parentesco;
+                $scope.MembrosFamilia[i].NomeParentesco = result.Data[i].NomeParentesco;
+                $scope.MembrosFamilia[i].Genero = result.Data[i].Genero;
+                $scope.MembrosFamilia[i].Nascimento = result.Data[i].NascimentoAuxiliar;
+                $scope.MembrosFamilia[i].NascimentoDB = result.Data[i].NascimentoAuxiliar;
+                $scope.MembrosFamilia[i].Telefone = result.Data[i].Telefone;
+                $scope.MembrosFamilia[i].Escolaridade = result.Data[i].Escolaridade;
+                $scope.MembrosFamilia[i].UltimaAtividade = result.Data[i].UltimaAtividade;
+                $scope.MembrosFamilia[i].Remuneracao = converteFloatMoeda(result.Data[i].Remuneracao);
+                $scope.MembrosFamilia[i].RemuneracaoDB = result.Data[i].Remuneracao;
+                $scope.MembrosFamilia[i].Doenca = result.Data[i].Doenca;
+                $scope.MembrosFamilia[i].DespesaDoenca = converteFloatMoeda(result.Data[i].DespesaDoenca);
+                $scope.MembrosFamilia[i].DespesaDoencaDB = result.Data[i].DespesaDoenca;
+                $scope.MembrosFamilia[i].Status = result.Data[i].Status;
+                $scope.MembrosFamilia[i].StatusDescricao = result.Data[i].StatusDescricao;
+                $scope.MembrosFamilia[i].Guid = result.Data[i].Guid;
+            }
+        },
+            function (error) {
+                alert(error);
+            });
+
+        return $scope.MembrosFamilia;
+    }
+
+    function BuscaMembroFamiliaSelecionado(guid) {
+        $scope.MembroFamiliarModal = InicializarObjetoMFModal();
+        FichaSocialService.GetMembroFamiliaSelecionado(guid).then(function (result) {
+            $scope.MembroFamiliarModal = result.Data;
+            $scope.MembroFamiliarModal.Nascimento = result.Data.NascimentoAuxiliar;
+            $scope.MembroFamiliarModal.NascimentoDB = result.Data.NascimentoAuxiliar;
+
+
+            // Inicialização/Atualização campos HTML
+            InicializarAtualizarHTML();
+        },
+            function (error) {
+                alert(error);
+            });
+
+        return $scope.MembroFamiliarModal;
+    }
+
+    function ValidarFichaSocial() {
+
+        $scope.MensagemErro = "";
+        for (i = 0; i < $scope.Maxpendencias; i++) {
+            $scope.Pendencias[i] = new Object();
+            $scope.Pendencias[i].Descricao = null;
+            $scope.Pendencias[i].Invalido = null;
+        }
+
+        i = -1;
+        $scope.NumeroPendencias = 0;
+        if ($scope.FichaSocial.FamiliaPossuiBens == null || $scope.FichaSocial.FamiliaPossuiBens == "" || $scope.FichaSocial.FamiliaPossuiBens == 0) {
+           $scope.MensagemErro = "Bens: Preencha se a 'Família possui bens'.";
+           i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+        }
+        if ($scope.FichaSocial.FamiliaPossuiBens == 1) {
+            if ($scope.FichaSocial.FaixaBens == null || $scope.FichaSocial.FaixaBens == "" || $scope.FichaSocial.FaixaBens == 0) {
+                $scope.MensagemErro = "Bens: Preencha a 'Faixa de valor dos bens de sua família'.";
+                i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+            }
+        }
+
+        return $scope.MensagemErro;
+    }
+
+    function ValidarRascunhoFichaSocial() {
+
+        $scope.MensagemErro = "";
+        for (i = 0; i < $scope.Maxpendencias; i++) {
+            $scope.Pendencias[i] = new Object();
+            $scope.Pendencias[i].Descricao = null;
+            $scope.Pendencias[i].Invalido = null;
+        }
+
+        i = -1;
+        $scope.NumeroPendencias = 0;
+
+        return $scope.MensagemErro;
+    }
+
+    function ChecagemCpfOk(anCpf) {
+        return vercpf(anCpf);
+    }
+
+    function vercpf(cpf) {
+        if (cpf == "" || cpf == null || cpf == '' || cpf.length != 11 || cpf == "00000000000" || cpf == "11111111111" || cpf == "22222222222" || cpf == "33333333333" || cpf == "44444444444" || cpf == "55555555555" || cpf == "66666666666" || cpf == "77777777777" || cpf == "88888888888" || cpf == "99999999999")
+            return false;
+        add = 0;
+        for (i = 0; i < 9; i++)
+            add += parseInt(cpf.charAt(i)) * (10 - i);
+        rev = 11 - (add % 11);
+        if (rev == 10 || rev == 11)
+            rev = 0;
+        if (rev != parseInt(cpf.charAt(9)))
+            return false;
+        add = 0;
+        for (i = 0; i < 10; i++)
+            add += parseInt(cpf.charAt(i)) * (11 - i);
+        rev = 11 - (add % 11);
+        if (rev == 10 || rev == 11)
+            rev = 0;
+        if (rev != parseInt(cpf.charAt(10)))
+            return false;
+        return true;
+    }
+
+    function isValidDate(s) {
+        var bits = s.split('/');
+        var d = new Date(bits[2], bits[1] - 1, bits[0]);
+        return d && (d.getMonth() + 1) == bits[1];
+    }
+
+    function dataSuperiorDataAtual(ano, mes, dia) {
+
+        var dataSuperior = false;
+
+        if (ano > 1900) {
+            var d = new Date;
+
+            ano_atual = d.getFullYear();
+            mes_atual = d.getMonth() + 1;
+            dia_atual = d.getDate();
+
+            mes = mes + 1;
+
+            if (ano > ano_atual) {
+                dataSuperior = true;
+            } else {
+                if (ano == ano_atual) {
+                    if (mes > mes_atual) {
+                        dataSuperior = true;
+                    } else {
+                        if (mes == mes_atual) {
+                            if (dia > dia_atual) {
+                                dataSuperior = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return dataSuperior;
+    }
+
+    function converteNascimentoStrDate(s) {
+        var bits = s.split('/');
+        var d = new Date(bits[2], bits[1] - 1, bits[0]);
+        return d;
+    }
+
+    function ValidarMembroFamiliar() {
+
+        $scope.MensagemErro = "";
+        for (i = 0; i < $scope.Maxpendencias; i++) {
+            $scope.Pendencias[i] = new Object();
+            $scope.Pendencias[i].Descricao = null;
+            $scope.Pendencias[i].Invalido = null;
+        }
+
+        i = -1;
+        $scope.NumeroPendencias = 0;
+
+        // Validando Nome
+        if ($scope.MembroFamiliarModal.Nome == "" || $scope.MembroFamiliarModal.Nome == null) {
+            $scope.MensagemErro = "Dados Pessoais: Preencha o 'Nome'.";
+            i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+        } else {
+            if ($scope.MembroFamiliarModal.Parentesco == 0 || $scope.MembroFamiliarModal.Parentesco == null) {
+                $scope.MensagemErro = "Dados Pessoais: Selecione o 'Parentesco'.";
+                i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+            } else {
+                if ($scope.MembroFamiliarModal.Nascimento == "" || $scope.MembroFamiliarModal.Nascimento == null || $scope.MembroFamiliarModal.Nascimento == undefined) {
+                    $scope.MensagemErro = "Dados Pessoais: Preencha a Data de Nascimento para validar o 'CPF'.";
+                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                } else {
+                    // Formatando Data de Nascimento
+                    if ($scope.MembroFamiliarModal.Nascimento.length != 10) {
+                        dia = $scope.MembroFamiliarModal.Nascimento.substr(0, 2);
+                        mes = $scope.MembroFamiliarModal.Nascimento.substr(2, 2);
+                        ano = $scope.MembroFamiliarModal.Nascimento.substr(4, 4);
+                        $scope.MembroFamiliarModal.Nascimento = dia.concat("/");
+                        $scope.MembroFamiliarModal.Nascimento = $scope.MembroFamiliarModal.Nascimento.concat(mes);
+                        $scope.MembroFamiliarModal.Nascimento = $scope.MembroFamiliarModal.Nascimento.concat("/");
+                        $scope.MembroFamiliarModal.Nascimento = $scope.MembroFamiliarModal.Nascimento.concat(ano);
+                    } else {
+                        ano = $scope.MembroFamiliarModal.Nascimento.substr(6, 4);
+                    }
+                    var dataNascimento = converteNascimentoStrDate($scope.MembroFamiliarModal.Nascimento);
+                    if (dataSuperiorDataAtual(dataNascimento.getFullYear(), dataNascimento.getMonth(), dataNascimento.getDate())) {
+                        $scope.MensagemErro = "Dados Pessoais: 'Data de Nascimento' superior a data atual!";
+                        i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                    } else {
+                        var idade = calculaIdade(dataNascimento.getFullYear(), dataNascimento.getMonth(), dataNascimento.getDate());
+                        if ( ($scope.MembroFamiliarModal.CPF == "" || $scope.MembroFamiliarModal.CPF == null || $scope.MembroFamiliarModal.CPF == undefined) && (idade >= 18) ) {
+                            $scope.MensagemErro = "Dados Pessoais: Preencha o 'CPF'.";
+                            i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                        } 
+                    }
+                }
+                if ($scope.MensagemErro == "") {
+                    if ($scope.MembroFamiliarModal.Genero == 0 || $scope.MembroFamiliarModal.Genero == null) {
+                        $scope.MensagemErro = "Dados Pessoais: Selecione o 'Gênero'.";
+                        i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                    } else {
+                        if ($scope.MembroFamiliarModal.Nascimento == "" || $scope.MembroFamiliarModal.Nascimento == null) {
+                            $scope.MensagemErro = "Dados Pessoais: Preencha a 'Data de Nascimento'.";
+                            i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro;; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                        } else {
+                            // Verificando se a Data de Nascimento é válida                            
+                            var dataValida = isValidDate($scope.MembroFamiliarModal.Nascimento);
+                            if (!dataValida) {
+                                $scope.MensagemErro = "Dados Pessoais: 'Data de Nascimento' inválida.";
+                                i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                            }
+                            if ($scope.MensagemErro == "") {
+                                if (($scope.MembroFamiliarModal.Telefone == 0 || $scope.MembroFamiliarModal.Telefone == null) && ($scope.MembroFamiliarModal.Parentesco != 11)) {
+                                    $scope.MensagemErro = "Dados Pessoais: Preencha o 'Telefone'.";
+                                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                } else {
+                                    if ($scope.MembroFamiliarModal.Escolaridade == 0 || $scope.MembroFamiliarModal.Escolaridade == null) {
+                                        $scope.MensagemErro = "Escolaridade: Selecione o Nível de Escolaridade:";
+                                        i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                    } else {
+                                        if ($scope.MembroFamiliarModal.UltimaAtividade == 0 || $scope.MembroFamiliarModal.UltimaAtividade == null) {
+                                            $scope.MensagemErro = "Remuneração: Selecione a 'Principal Atividade Atual'.";
+                                            i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                        } else {
+                                            if ($scope.MembroFamiliarModal.UltimaAtividade != 4 && $scope.MembroFamiliarModal.UltimaAtividade != 11) {
+                                                if ($scope.MembroFamiliarModal.Remuneracao <= 0 || $scope.MembroFamiliarModal.Remuneracao == null || $scope.MembroFamiliarModal.Remuneracao == "") {
+                                                    $scope.MensagemErro = "Remuneração: Preencha a 'Remuneração Total' com valor acima de zero.";
+                                                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                                } else {
+                                                    $scope.MembroFamiliarModal.Remuneracao = transformaValorMoeda($scope.MembroFamiliarModal.Remuneracao);
+                                                    if (!isValorMoeda($scope.MembroFamiliarModal.Remuneracao)) {
+                                                        $scope.MensagemErro = "Remuneração: Preencha a 'Remuneração Total' com valor numérico.";
+                                                        i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                                    }
+                                                }
+                                            }
+
+                                            if ($scope.MensagemErro == "") {
+                                                if ($scope.MensagemErro == "") {
+                                                    if ($scope.MembroFamiliarModal.Doenca == 0 || $scope.MembroFamiliarModal.Doenca == null) {
+                                                        $scope.MensagemErro = "Doença: Selecione se tem 'Doença grave/crônica/deficiência'.";
+                                                        i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                                    } else {
+                                                        if ($scope.MembroFamiliarModal.Doenca == 1) {
+                                                            if (($scope.MembroFamiliarModal.DespesaDoenca < 0 || $scope.MembroFamiliarModal.DespesaDoenca == null || $scope.MembroFamiliarModal.DespesaDoenca == "") && ($scope.MembroFamiliarModal.DespesaDoenca != "0")) {
+                                                                $scope.MensagemErro = "Doença: Preencha a 'Despesa Mensal com Doença grave/crônica/deficiência'.";
+                                                                i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                                            } else {
+                                                                $scope.MembroFamiliarModal.DespesaDoenca = transformaValorMoeda($scope.MembroFamiliarModal.DespesaDoenca);
+                                                                if (!isValorMoeda($scope.MembroFamiliarModal.DespesaDoenca)) {
+                                                                    $scope.MensagemErro = "Doença: Preencha a 'Despesa Mensal com Doença grave/crônica/deficiência' com valor numérico.";
+                                                                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return $scope.MensagemErro;
+    }
+
+    function ValidarRascunhoMembroFamiliar() {
+
+        $scope.MensagemErro = "";
+        for (i = 0; i < $scope.Maxpendencias; i++) {
+            $scope.Pendencias[i] = new Object();
+            $scope.Pendencias[i].Descricao = null;
+            $scope.Pendencias[i].Invalido = null;
+        }
+
+        i = -1;
+        $scope.NumeroPendencias = 0;
+
+        // Validando Nome
+        if ($scope.MembroFamiliarModal.Nome == "" || $scope.MembroFamiliarModal.Nome == null) {
+            $scope.MensagemErro = "Dados Pessoais: Preencha o 'Nome'.";
+            i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+        } 
+        if ($scope.MembroFamiliarModal.Nascimento == "" || $scope.MembroFamiliarModal.Nascimento == null || $scope.MembroFamiliarModal.Nascimento == undefined) {
+                
+        } else {
+            // Formatando Data de Nascimento
+            if ($scope.MembroFamiliarModal.Nascimento.length != 10) {
+                dia = $scope.MembroFamiliarModal.Nascimento.substr(0, 2);
+                mes = $scope.MembroFamiliarModal.Nascimento.substr(2, 2);
+                ano = $scope.MembroFamiliarModal.Nascimento.substr(4, 4);
+                $scope.MembroFamiliarModal.Nascimento = dia.concat("/");
+                $scope.MembroFamiliarModal.Nascimento = $scope.MembroFamiliarModal.Nascimento.concat(mes);
+                $scope.MembroFamiliarModal.Nascimento = $scope.MembroFamiliarModal.Nascimento.concat("/");
+                $scope.MembroFamiliarModal.Nascimento = $scope.MembroFamiliarModal.Nascimento.concat(ano);
+            } else {
+                ano = $scope.MembroFamiliarModal.Nascimento.substr(6, 4);
+            }
+            var dataNascimento = converteNascimentoStrDate($scope.MembroFamiliarModal.Nascimento);
+            if (dataSuperiorDataAtual(dataNascimento.getFullYear(), dataNascimento.getMonth(), dataNascimento.getDate())) {
+                $scope.MensagemErro = "Dados Pessoais: 'Data de Nascimento' superior a data atual!";
+                i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+            } 
+        }
+        if ($scope.MensagemErro == "") {
+            if ($scope.MembroFamiliarModal.Nascimento == "" || $scope.MembroFamiliarModal.Nascimento == null) {
+
+            } else {
+                // Verificando se a Data de Nascimento é válida                            
+                var dataValida = isValidDate($scope.MembroFamiliarModal.Nascimento);
+                if (!dataValida) {
+                    $scope.MensagemErro = "Dados Pessoais: 'Data de Nascimento' inválida.";
+                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                }
+            }
+        }
+        if ($scope.MensagemErro == "") {
+            if ($scope.MembroFamiliarModal.Escolaridade == 0) {
+                $scope.MensagemErro = "Escolaridade: Selecione o Nível de Escolaridade:";
+                i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+            } else {
+                if ($scope.MembroFamiliarModal.UltimaAtividade != 4 && $scope.MembroFamiliarModal.UltimaAtividade != 11) {
+                    if ($scope.MembroFamiliarModal.Remuneracao <= 0 || $scope.MembroFamiliarModal.Remuneracao == null || $scope.MembroFamiliarModal.Remuneracao == "") {
+
+                    } else {
+                        $scope.MembroFamiliarModal.Remuneracao = transformaValorMoeda($scope.MembroFamiliarModal.Remuneracao);
+                        if (!isValorMoeda($scope.MembroFamiliarModal.Remuneracao)) {
+                            $scope.MensagemErro = "Remuneração: Preencha a 'Remuneração Total' com valor numérico.";
+                            i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($scope.MensagemErro == "") {
+            if ($scope.MembroFamiliarModal.Doenca == 1) {
+                if (($scope.MembroFamiliarModal.DespesaDoenca < 0 || $scope.MembroFamiliarModal.DespesaDoenca == null || $scope.MembroFamiliarModal.DespesaDoenca == "") && ($scope.MembroFamiliarModal.DespesaDoenca != "0")) {
+
+                } else {
+                    $scope.MembroFamiliarModal.DespesaDoenca = transformaValorMoeda($scope.MembroFamiliarModal.DespesaDoenca);
+                    if (!isValorMoeda($scope.MembroFamiliarModal.DespesaDoenca)) {
+                        $scope.MensagemErro = "Doença: Preencha a 'Despesa Mensal com Doença grave/crônica/deficiência' com valor numérico.";
+                        i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                    }
+                }
+            }
+        }
+
+        return $scope.MensagemErro;
+    }
+
+    function converteFloatMoeda(valor) {
+        var inteiro = null, decimal = null, c = null, j = null;
+        var aux = new Array();
+        valor = "" + valor;
+        c = valor.indexOf(".", 0);
+        //encontrou o ponto na string
+        if (c > 0) {
+            //separa as partes em inteiro e decimal
+            inteiro = valor.substring(0, c);
+            decimal = valor.substring(c + 1, valor.length);
+        } else {
+            inteiro = valor;
+        }
+
+        //pega a parte inteiro de 3 em 3 partes
+        for (j = inteiro.length, c = 0; j > 0; j -= 3, c++) {
+            aux[c] = inteiro.substring(j - 3, j);
+        }
+
+        //percorre a string acrescentando os pontos
+        inteiro = "";
+        for (c = aux.length - 1; c >= 0; c--) {
+            inteiro += aux[c] + '.';
+        }
+        //retirando o ultimo ponto e finalizando a parte inteiro
+
+        inteiro = inteiro.substring(0, inteiro.length - 1);
+
+        decimal = parseInt(decimal);
+        if (isNaN(decimal)) {
+            decimal = "00";
+        } else {
+            decimal = "" + decimal;
+            if (decimal.length === 1) {
+                decimal = decimal + "0";
+            }
+        }
+
+        valor = "R$ " + inteiro + "," + decimal;
+
+        return valor;
+    }
+
+    $scope.FiltroPendenciasInvalidas = function (value) {
+        return (value.Invalido == 1);
+    };
+
+    function isNumber(n) {
+        return !isNaN(parseFloat(n)) && isFinite(n);
+    }
+
+    function isValorMoeda(valor) {
+
+        var ehMoedaValida = false;
+        var inteiro = null, decimal = null, c = null, j = null;
+        var aux = new Array();
+        valor = "" + valor;
+
+        c = valor.indexOf(",", 0);
+
+        //encontrou a vírgula na string
+        if (c > 0) {
+            //separa as partes em inteiro e decimal
+            inteiro = valor.substring(0, c);
+            decimal = valor.substring(c + 1, valor.length);
+
+            //pega a parte inteiro de 3 em 3 partes
+            for (j = inteiro.length, c = 0; j > 0; j -= 3, c++) {
+                aux[c] = inteiro.substring(j - 3, j);
+            }
+
+            //percorre a string acrescentando os pontos
+            inteiro = "";
+            for (c = aux.length - 1; c >= 0; c--) {
+                //inteiro += aux[c] + '.';
+                inteiro += aux[c];
+            }
+            //retirando o ultimo ponto e finalizando a parte inteiro
+
+            inteiro = inteiro.substring(0, inteiro.length - 1);
+
+            decimal = parseInt(decimal);
+            if (isNaN(decimal)) {
+                decimal = "00";
+            } else {
+                decimal = "" + decimal;
+                if (decimal.length === 1) {
+                    decimal = decimal + "0";
+                }
+            }
+
+            valor = inteiro + decimal;
+        }
+
+        if (isNumber(valor)) {
+            c = null;            
+            c = valor.indexOf(".", 0);
+            //encontrou o ponto na string
+            if (c > 0) {
+                ehMoedaValida = false;
+            } else {
+                ehMoedaValida = true;
+            }
+        }
+
+        return ehMoedaValida;
+    }
+    
+    function transformaValorMoeda(valor) {
+
+        var inteiro = null, decimal = null, c = null, j = null;
+        var aux = new Array();
+        valor = "" + valor;
+
+        c = valor.indexOf(".", 0);
+
+        //encontrou o ponto na string
+        if (c > 0) {
+            //separa as partes em inteiro e decimal
+            inteiro = valor.substring(0, c);
+            decimal = valor.substring(c + 1, valor.length);
+
+            //pega a parte inteiro de 3 em 3 partes
+            for (j = inteiro.length, c = 0; j > 0; j -= 3, c++) {
+                aux[c] = inteiro.substring(j - 3, j);
+            }
+
+            //percorre a string acrescentando os pontos
+            inteiro = "";
+            for (c = aux.length - 1; c >= 0; c--) {
+                //inteiro += aux[c] + '.';
+                inteiro += aux[c];
+            }
+            //retirando o ultimo ponto e finalizando a parte inteiro
+
+            //inteiro = inteiro.substring(0, inteiro.length - 1);
+            inteiro = inteiro.substring(0, inteiro.length);
+
+            decimal = parseInt(decimal);
+            if (isNaN(decimal)) {
+                decimal = "00";
+            } else {
+                decimal = "" + decimal;
+                if (decimal.length === 1) {
+                    decimal = decimal + "0";
+                }
+            }
+
+            valor = inteiro + "," + decimal;
+        }
+
+        return valor;
+    }
+
+    function calculaIdade(ano_aniversario, mes_aniversario, dia_aniversario) {
+        var d = new Date;
+        ano_atual = d.getFullYear();
+        mes_atual = d.getMonth() + 1;
+        dia_atual = d.getDate();
+
+        ano_aniversario = ano_aniversario;
+        mes_aniversario = mes_aniversario + 1;
+        dia_aniversario = dia_aniversario;
+
+        quantos_anos = ano_atual - ano_aniversario;
+
+        if (mes_atual < mes_aniversario || mes_atual == mes_aniversario && dia_atual < dia_aniversario) {
+            quantos_anos--;
+        }
+
+        return quantos_anos < 0 ? 0 : quantos_anos;
+    }
+
+    function AtualizarDocumentosEnviados() {
+        FichaSocialService.GetDocumentosEnviadosFichaSocialLogada($scope.GuidFichaSocial).then(function (result) {
+
+            $scope.DocumentosEnviadosPessoaLogada = result.Data;
+
+            for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+                $scope.DocumentacaoInscricao[j].DocumentoJaEnviado = 0;
+                $scope.DocumentacaoInscricao[j].NumeroArquivos = 0;
+                $scope.DocumentacaoInscricao[j].Arquivo = "";
+                $scope.DocumentacaoInscricao[j].PathRelativo = "";
+                $scope.DocumentacaoInscricao[j].HandleArquivoDigital = 0;
+            }
+
+            for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+                for (var i = 0; i < $scope.DocumentosEnviadosPessoaLogada.length; i++) {
+                    if ($scope.DocumentacaoInscricao[j].NomeDocumento == $scope.DocumentosEnviadosPessoaLogada[i].NomeDocumento) {
+                        $scope.DocumentacaoInscricao[j].DocumentoJaEnviado = 1;
+                        $scope.DocumentacaoInscricao[j].NumeroArquivos = 0;
+                        for (var k = 0; k < $scope.DocumentosEnviadosPessoaLogada.length; k++) {
+                            if ($scope.DocumentosEnviadosPessoaLogada[k].NomeDocumento == $scope.DocumentacaoInscricao[j].NomeDocumento) {
+                                $scope.DocumentacaoInscricao[j].NumeroArquivos = $scope.DocumentacaoInscricao[j].NumeroArquivos + 1;
+                            }
+                        }
+                        $scope.DocumentacaoInscricao[j].Arquivo = $scope.DocumentosEnviadosPessoaLogada[i].Arquivo;
+                        $scope.DocumentacaoInscricao[j].PathRelativo = $scope.DocumentosEnviadosPessoaLogada[i].PathRelativo;
+                        $scope.DocumentacaoInscricao[j].HandleArquivoDigital = $scope.DocumentosEnviadosPessoaLogada[i].HandleArquivoDigital;
+                        $scope.DocumentacaoInscricao[j].Handle = $scope.DocumentosEnviadosPessoaLogada[i].TipoDocumento;
+                    }
+                }
+            }
+            $scope.ValidacaoTabDocumentacao = ValidarTabDocumentacao();
+            $scope.DocumentacaoArquivos = BuscaArquivosTipoDocumento();
+        });
+
+        return $scope.DocumentacaoInscricao;
+    }
+
+    function ValidarTabDocumentacao() {
+
+        $scope.MensagemErro = "Existem documentos não enviados!";
+        $scope.NumeroPendencias = 0;
+
+        for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+            if ($scope.DocumentacaoInscricao[j].DocumentoJaEnviado == 0) {
+                $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+            }
+        }
+        if ($scope.NumeroPendencias == 0) { $scope.MensagemErro = ""; }
+
+        return $scope.MensagemErro;
+    }
+
+    function BuscaArquivosTipoDocumento() {
+        $scope.TotalArquivos = 0;
+        for (var k = 0; k < $scope.NumTotalArquivos; k++) {
+            $scope.DocumentacaoArquivos[k].TipoDocumento = 0;
+            $scope.DocumentacaoArquivos[k].NomeDocumento = "";
+            $scope.DocumentacaoArquivos[k].Arquivo = "";
+            $scope.DocumentacaoArquivos[k].PathRelativo = "";
+            $scope.DocumentacaoArquivos[k].HandleArquivoDigital = 0;
+        }
+        var k = -1;
+        for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+            for (var i = 0; i < $scope.DocumentosEnviadosPessoaLogada.length; i++) {
+                if ($scope.DocumentacaoInscricao[j].Handle == $scope.DocumentosEnviadosPessoaLogada[i].TipoDocumento) {
+                    k = k + 1;
+                    $scope.DocumentacaoArquivos[k].TipoDocumento = $scope.DocumentacaoInscricao[j].Handle;
+                    $scope.DocumentacaoArquivos[k].NomeDocumento = $scope.DocumentacaoInscricao[j].NomeDocumento;
+                    $scope.DocumentacaoArquivos[k].Arquivo = $scope.DocumentosEnviadosPessoaLogada[i].Arquivo;
+                    $scope.DocumentacaoArquivos[k].PathRelativo = $scope.DocumentosEnviadosPessoaLogada[i].PathRelativo;
+                    $scope.DocumentacaoArquivos[k].HandleArquivoDigital = $scope.DocumentosEnviadosPessoaLogada[i].HandleArquivoDigital;
+                    $scope.DocumentacaoArquivos[k].Handle = $scope.DocumentacaoInscricao[j].Handle;
+                    $scope.TotalArquivos = $scope.TotalArquivos + 1;
+                }
+            }
+        }
+        return $scope.DocumentacaoArquivos;
+    }
+
+    // Botão: Incluir Membro Familiar 
+    $scope.clickBtnIncluirMembroFamiliar = function (fichaSocial) {
+        $scope.EhRequerente = 0;
+        $scope.TituloCabecalhoMembroFamiliar = "Incluir Informações do Novo Membro Familiar";
+        $scope.MembroFamiliarModal = InicializarObjetoMFModal();
+        $('#modal-EditarMembroFamiliar').modal('show');        
+        FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+            if (result.data !== null) {
+                fichaSocial.Status = result.Data.Status;
+                fichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                $scope.FichaSocial.Status = result.Data.Status;
+                $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                //toastr["success"]("Membro Familiar incluído com sucesso!");
+                //toastr["info"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+            }
+        },
+        function (error) {
+            alert(error);
+        });
+        //location.href = "#/FichaSocial";
+        //location.reload();
+    };
+            
+    // Botão: Editar Membro Familiar  
+    $scope.clickBtnEditarMembroFamiliar = function (itemMembroFamiliar) {
+        if (itemMembroFamiliar.Parentesco == 11) { $scope.EhRequerente = 1; }
+        else { $scope.EhRequerente = 0; }
+        $scope.TituloCabecalhoMembroFamiliar = "Atualizar Informações do Membro Familiar";
+        $scope.MembroFamiliarModal = BuscaMembroFamiliaSelecionado(itemMembroFamiliar.Guid);
+        $('#modal-EditarMembroFamiliar').modal('show');
+        //location.href = "#/FichaSocial";
+        //location.reload();
+    };
+
+    // Botão: Remover Membro Familiar
+    $scope.clickBtnRemoverMembroFamilia = function (itemMembroFamiliar) {
+        if (confirm("Você realmente deseja remover '" + itemMembroFamiliar.Nome + "'?")) {
+            FichaSocialService.RemoverMembroFamiliar($scope.GuidFichaSocial, itemMembroFamiliar.Guid).then(function (result) {
+                if (result.Data) {
+                    $scope.MembrosFamilia = BuscaTodosMembrosFamilia();
+                    $scope.MembroFamiliarModal = InicializarObjetoMFModal();
+                    toastr["error"]("Membro Familiar removido com sucesso!");
+                    FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                        if (result.data !== null) {
+                            $scope.FichaSocial.Status = result.Data.Status;
+                            $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                            toastr["info"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                        }
+                    },
+                    function (error) {
+                        alert(error);
+                    });
+                    /*if (fichaSocial.Status != 36) {
+                        location.href = "#/FichaSocial";
+                        location.reload();
+                    }*/
+                }
+            });
+        }
+    };
+
+    // Atualizar Tipo de Ingresso
+    $scope.changeTipoIngresso = function (FichaSocial) { InicializarAtualizarHTML(); };
+
+    // Atualizar Família Possui Bens
+    $scope.changeFamiliaPossuiBens = function (FichaSocial) { InicializarAtualizarHTML(); };
+
+    $scope.clickGrauParentesco = function () {
+        FichaSocialService.GetGrausParentesco().then(function (result) {
+            $scope.GrausParentesco = result.Data;
+        });
+    };
+
+    $scope.clickFaixaBens = function () {
+
+    };
+
+    // Atualizar Atividade Principal
+    $scope.changeUltimaAtividade = function (MembroFamiliarModal) { InicializarAtualizarHTML(); };
+
+    // Atualizar Escolaridade
+    //$scope.changeEscolaridade = function (MembroFamiliarModal) { InicializarAtualizarHTML(); };
+
+    // Atualizar Doença
+    $scope.changeDoenca = function (MembroFamiliarModal) { InicializarAtualizarHTML(); };
+
+    // Botão: Cancelar Membro Familiar
+    $scope.clickBtnCancelarMembroFamiliar = function (FichaSocial, MembroFamiliarModal) {
+
+        $scope.MembroFamiliarModal.Remuneracao = "";
+        $scope.MembroFamiliarModal.RemuneracaoDB = "";
+
+        // Incializa/Atualiza Doença
+        $scope.MembroFamiliarModal.Doenca = 0;
+        $scope.MembroFamiliarModal.DespesaDoenca = "";
+        $scope.MembroFamiliarModal.DespesaDoencaDB = "";
+        $scope.EhObrigatorioDoenca = 0;
+        document.getElementById('despesaDoenca').disabled == true;
+    };
+
+    // Botão: Confirmar Membro Familiar
+    $scope.clickBtnConfirmarMembroFamiliar = function (fichaSocial, membroFamiliarModal) {
+        // Data de Nascimento
+        membroFamiliarModal.NascimentoDB = membroFamiliarModal.Nascimento;
+        // Remuneração
+        if (membroFamiliarModal.Remuneracao == undefined) {
+            membroFamiliarModal.Remuneracao = membroFamiliarModal.RemuneracaoDB;
+        } else {
+            if (membroFamiliarModal.Remuneracao.toString().substr(0, 2) == "R$") {
+                membroFamiliarModal.Remuneracao = membroFamiliarModal.RemuneracaoDB;
+            } else {
+                $scope.MembroFamiliarModal.Remuneracao = transformaValorMoeda($scope.MembroFamiliarModal.Remuneracao);
+            }
+        }
+        // Despesa Mensal
+        if (membroFamiliarModal.DespesaMensal == undefined) {
+            membroFamiliarModal.DespesaMensal = membroFamiliarModal.DespesaMensalDB;
+        } else {
+            if (membroFamiliarModal.DespesaMensal.toString().substr(0, 2) == "R$") {
+                membroFamiliarModal.DespesaMensal = membroFamiliarModal.DespesaMensalDB;
+            } else {
+                $scope.MembroFamiliarModal.DespesaMensal = transformaValorMoeda($scope.MembroFamiliarModal.DespesaMensal);
+            }
+        }
+        // Despesa Doença
+        if (membroFamiliarModal.DespesaDoenca == undefined) {
+            membroFamiliarModal.DespesaDoenca = membroFamiliarModal.DespesaDoencaDB;
+        } else {
+            if (membroFamiliarModal.DespesaDoenca.toString().substr(0, 2) == "R$") {
+                membroFamiliarModal.DespesaDoenca = membroFamiliarModal.DespesaDoencaDB;
+            } else {
+                $scope.MembroFamiliarModal.DespesaDoenca = transformaValorMoeda($scope.MembroFamiliarModal.DespesaDoenca);
+            }
+        }
+        // Confirmar Membro Familiar
+        if (confirm("Você realmente confirma o Membro Familiar <" + membroFamiliarModal.Nome + ">?")) {
+            $scope.ValidacaoMembroFamiliar = ValidarMembroFamiliar();
+            //$scope.ValidacaoMembroFamiliar = "";
+            if ($scope.ValidacaoMembroFamiliar == "") {
+                FichaSocialService.SalvarMembroFamiliar(fichaSocial, membroFamiliarModal, "S").then(function (result) {
+                    if (result.Data) {
+                        toastr["success"]("Membro Familiar confirmado com sucesso!");                        
+                        $('#modal-MostrarPendenciasFichaSocial').modal('hide');
+                        $('#modal-EditarMembroFamiliar').modal('hide');
+                        $scope.MembrosFamilia = BuscaTodosMembrosFamilia();
+                        $scope.MembroFamiliarModal = InicializarObjetoMFModal();
+                        FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                            if (result.data !== null) {
+                                fichaSocial.Status = result.Data.Status;
+                                fichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                $scope.FichaSocial.Status = result.Data.Status;
+                                $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                toastr["info"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                            }
+                        },
+                        function (error) {
+                            alert(error);
+                        });
+                        /*if (fichaSocial.Status != 36) {
+                            location.href = "#/FichaSocial";
+                            location.reload();
+                        }*/
+                    }
+                }, function (resultError) {
+                    alert(resultError.ErrorMessage);
+                });
+            }
+            else {
+                alert($scope.ValidacaoMembroFamiliar);
+                //$('#modal-MostrarPendenciasFichaSocial').modal('show');
+            }
+        }
+    };
+    
+    // Botão: Salvar Rascunho do Membro Familiar
+    $scope.clickBtnSalvarRascunhoMembroFamiliar = function (fichaSocial, membroFamiliarModal) {
+        // Data de Nascimento
+        membroFamiliarModal.NascimentoDB = membroFamiliarModal.Nascimento;
+
+        // Remuneração
+        if (membroFamiliarModal.Remuneracao == undefined) {
+            membroFamiliarModal.Remuneracao = membroFamiliarModal.RemuneracaoDB;
+        } else {
+            if (membroFamiliarModal.Remuneracao.toString().substr(0, 2) == "R$") {
+                membroFamiliarModal.Remuneracao = membroFamiliarModal.RemuneracaoDB;
+            } else {
+                $scope.MembroFamiliarModal.Remuneracao = transformaValorMoeda($scope.MembroFamiliarModal.Remuneracao);
+            }
+        }
+        // Despesa Mensal
+        if (membroFamiliarModal.DespesaMensal == undefined) {
+            membroFamiliarModal.DespesaMensal = membroFamiliarModal.DespesaMensalDB;
+        } else {
+            if (membroFamiliarModal.DespesaMensal.toString().substr(0, 2) == "R$") {
+                membroFamiliarModal.DespesaMensal = membroFamiliarModal.DespesaMensalDB;
+            } else {
+                $scope.MembroFamiliarModal.DespesaMensal = transformaValorMoeda($scope.MembroFamiliarModal.DespesaMensal);
+            }
+        }
+        // Despesa Doença
+        if (membroFamiliarModal.DespesaDoenca == undefined) {
+            membroFamiliarModal.DespesaDoenca = membroFamiliarModal.DespesaDoencaDB;
+        } else {
+            if (membroFamiliarModal.DespesaDoenca.toString().substr(0, 2) == "R$") {
+                membroFamiliarModal.DespesaDoenca = membroFamiliarModal.DespesaDoencaDB;
+            } else {
+                $scope.MembroFamiliarModal.DespesaDoenca = transformaValorMoeda($scope.MembroFamiliarModal.DespesaDoenca);
+            }
+        }
+        // Confirmar Salvar Rascunho do Membro Familiar
+        if (confirm("Você deseja salvar o rascunho do Membro Familiar <" + membroFamiliarModal.Nome + ">?")) {
+            $scope.ValidacaoRascunhoMembroFamiliar = ValidarRascunhoMembroFamiliar();
+            if ($scope.ValidacaoRascunhoMembroFamiliar == "") {
+                FichaSocialService.SalvarMembroFamiliar(fichaSocial, membroFamiliarModal, "R").then(function (result) {
+                    if (result.Data) {
+                        toastr["warning"]("Rascunho do Membro Familiar salvo com sucesso!");
+                        $('#modal-MostrarPendenciasFichaSocial').modal('hide');
+                        $('#modal-EditarMembroFamiliar').modal('hide');
+                        $scope.MembrosFamilia = BuscaTodosMembrosFamilia();
+                        $scope.MembroFamiliarModal = InicializarObjetoMFModal();
+                        FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                            if (result.data !== null) {
+                                fichaSocial.Status = result.Data.Status;
+                                fichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                $scope.FichaSocial.Status = result.Data.Status;
+                                $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                toastr["info"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                            }
+                        },
+                        function (error) {
+                            alert(error);
+                        });
+                        /*if (fichaSocial.Status != 36) {
+                            location.href = "#/FichaSocial";
+                            location.reload();
+                        }*/
+                    }
+                }, function (resultError) {
+                    alert(resultError.ErrorMessage);
+                });
+            }
+            else {
+                alert($scope.ValidacaoRascunhoMembroFamiliar);
+                //$('#modal-MostrarPendenciasFichaSocial').modal('show');
+            }
+        }
+    };
+
+    // Botão: Confirmar Ficha Social - Sem o Concordo
+    $scope.clickBtnConfirmarFichaSocial = function (fichaSocial) {
+        if (confirm(fichaSocial.Nome + ", você realmente confirma sua Ficha Social?")) {
+            $scope.ValidacaoFichaSocial = ValidarFichaSocial();
+            if ($scope.ValidacaoFichaSocial == "") {
+                $scope.TotalArquivosObrigatorios = 0;
+                $scope.TotalArquivosOpcionais = 0;
+                $scope.TotalArquivosObrigatoriosEnviados = 0;
+                $scope.TotalArquivosOpcionaisEnviados = 0;
+                for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+                    if ($scope.DocumentacaoInscricao[j].TipoPostagem == "G") {
+                        $scope.TotalArquivosObrigatorios = $scope.TotalArquivosObrigatorios + 1;
+                    }
+                    if ($scope.DocumentacaoInscricao[j].TipoPostagem == "O") {
+                        $scope.TotalArquivosOpcionais = $scope.TotalArquivosOpcionais + 1;
+                    }
+                }
+                $scope.DocumentacaoArquivos = BuscaArquivosTipoDocumento();
+                for (var j = 0; j < $scope.DocumentacaoInscricao.length; j++) {
+                    for (var i = 0; i < $scope.DocumentacaoArquivos.length; i++) {
+                        if ($scope.DocumentacaoInscricao[j].Handle == $scope.DocumentacaoArquivos[i].Handle) {
+                            if ($scope.DocumentacaoInscricao[j].TipoPostagem == "G" && $scope.DocumentacaoArquivos[i].HandleArquivoDigital > 0) {
+                                $scope.TotalArquivosObrigatoriosEnviados = $scope.TotalArquivosObrigatoriosEnviados + 1;
+                            }
+                            if ($scope.DocumentacaoInscricao[j].TipoPostagem == "O" && $scope.DocumentacaoArquivos[i].HandleArquivoDigital > 0) {
+                                $scope.TotalArquivosOpcionaisEnviados = $scope.TotalArquivosOpcionaisEnviados + 1;
+                            }
+                        }
+                    }
+                }
+                i = 0;
+                if ($scope.TotalArquivosObrigatoriosEnviados < $scope.TotalArquivosObrigatorios) {
+                    $scope.MensagemErro = "Upload dos Documentos: Exite(m) documento(s) obrigatório(s) não enviado(s).";
+                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                }
+                if ($scope.TotalArquivosOpcionaisEnviados <= 0) {
+                    $scope.MensagemErro = "Upload dos Documentos: Anexe pelo menos um documento comprobatório.";
+                    i = i + 1; $scope.Pendencias[i].Descricao = $scope.MensagemErro; $scope.Pendencias[i].Invalido = 1; $scope.NumeroPendencias = $scope.NumeroPendencias + 1;
+                }
+                if ($scope.MensagemErro == "") {
+                    $scope.TituloMensagemFinal = "Confirmando Ficha Social";
+                    $scope.TipoBotaoFichaSocialOficial = 1;
+                    $('#modal-MostrarMensagemConcordo').modal('show');
+                } else {
+                    $('#modal-MostrarPendenciasFichaSocial').modal('show');
+                }
+            }
+            else {
+                $('#modal-MostrarPendenciasFichaSocial').modal('show');
+            }
+        }
+    };
+
+    // Botão: Confirmar Ficha Social - Com o Concordo
+    $scope.clickBtnConfirmarConcordoFichaSocial = function (fichaSocial) {
+        FichaSocialService.SalvarFichaSocial(fichaSocial, 'S').then(function (result) {
+            if (result.Data) {
+                FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                    if (result.data !== null) {
+                        fichaSocial.Status = result.Data.Status;
+                        fichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                        $scope.FichaSocial.Status = result.Data.Status;
+                        $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                        toastr["success"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                        $scope.TituloMensagemFinal = "ATENÇÃO";
+                        $('#modal-MostrarMensagemFinal').modal('show');
+                    }
+                },
+                function (error) {
+                    alert(error);
+                });
+                //location.href = "#/FichaSocial";
+                //location.reload();
+            }
+        }, function (resultError) {
+            alert(resultError.ErrorMessage);
+        });
+    };
+
+    // Botão: Salvar Rascunho Ficha Social
+    $scope.clickBtnSalvarRascunhoFichaSocial = function (fichaSocial) {
+        if (confirm(fichaSocial.Nome + ", você deseja salvar o rascunho de sua Ficha Social?")) {
+            $scope.ValidacaoRascunhoFichaSocial = ValidarRascunhoFichaSocial();
+            if ($scope.ValidacaoRascunhoFichaSocial == "") {
+                FichaSocialService.SalvarFichaSocial(fichaSocial, 'R').then(function (result) {
+                    if (result.Data) {
+                        $scope.TituloMensagemFinal = "Rascunho da Ficha Social";
+                        $scope.TipoBotaoFichaSocialOficial = 0;
+                        $('#modal-MostrarMensagemConcordo').modal('show');
+                        FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                            if (result.data !== null) {
+                                fichaSocial.Status = result.Data.Status;
+                                fichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                $scope.FichaSocial.Status = result.Data.Status;
+                                $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                toastr["warning"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                            }
+                        },
+                        function (error) {
+                            alert(error);
+                        });
+                        //location.href = "#/FichaSocial";
+                        //location.reload();
+                    }
+                }, function (resultError) {
+                    alert(resultError.ErrorMessage);
+                });
+            }
+            else {
+                $('#modal-MostrarPendenciasFichaSocial').modal('show');
+            }
+        }
+    };
+
+    // Botão: FecharModalPendencias
+    /*$scope.btnClickFecharModalPendencias = function () {
+        $('#modal-MostrarPendenciasFichaSocial').modal('hide');
+        $('#modal-EditarMembroFamiliar').modal('hide');
+        $('#modal-EditarMembroFamiliar').modal('show');
+    };*/
+
+    // Mostrar Hint Documento
+    $scope.clickMostrarHint = function (itemDocumentacao) {
+        $scope.NomeDocumento = itemDocumentacao.NomeDocumento;
+        $scope.HandleDocumento = itemDocumentacao.Handle;
+        $scope.OrdemHint = itemDocumentacao.OrdemHint;
+        $scope.ConteudoHint = itemDocumentacao.ConteudoHint;
+        $('#modal-MostraHint').modal('show');
+    };
+
+    // Enviar
+    $scope.clickBtnEnviar = function (itemDocumentacao) {
+        $scope.NomeDocumento = itemDocumentacao.NomeDocumento;
+        $scope.HandleDocumento = itemDocumentacao.Handle;
+        $scope.Ordem = itemDocumentacao.Ordem;
+        $scope.ConteudoHint = itemDocumentacao.ConteudoHint;
+        $scope.CPF = $scope.FichaSocial.CPF;
+        $scope.NumArquivosTipoDocumento = 0;
+        FichaSocialService.GetNumArquivosTipoDocumento($scope.GuidFichaSocial,$scope.NomeDocumento).then(function (result) {
+            $scope.NumArquivosTipoDocumento = result.Data.length;
+            $('#modal-UpLoad').modal('show');
+            document.getElementById("arquivo").value = "";
+            $scope.upload = [];
+            $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+        });
+    };
+    
+    $scope.clickConcluirUpLoadDocumento = function () {
+        if (document.getElementById("arquivo").value == "") {
+            toastr["info"]("O campo Arquivo deve ser preenchido!");
+            return;
+        };
+        $scope.fileUploadData = { Nome: $scope.NomeDocumento, Handle: $scope.HandleDocumento, CPF: $scope.CPF, GUID: $scope.GuidFichaSocial  };
+        $scope.onFileSelect(arquivo.files, $scope.fileUploadData);
+        document.getElementById("arquivo").value = "";
+        $scope.upload = [];
+        $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+        FichaSocialService.DesfazerStatusFichaSocial($scope.FichaSocial).then(function (result) {
+            if (result.Data) {
+                FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                    if (result.Data) {
+                        $scope.FichaSocial.Status = result.Data.Status;
+                        $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                        toastr["warning"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                    }
+                },
+                function (error) {
+                    alert(error);
+                });
+                //location.href = "#/FichaSocial";
+                //location.reload();
+            }
+        }, function (resultError) {
+            alert(resultError.ErrorMessage);
+        });
+    };
+
+    $scope.onFileSelect = function ($files, dadosAnexo) {
+        var deferred = $q.defer();
+        for (var i = 0; i < $files.length; i++) {
+            var $file = $files[i];
+            $scope.mdEsconderProgressAnexo = false;
+            deferred.resolve(
+                UploadBase.upload({
+                    url: "https://siteseguro.inatel.br/GestaoIngressante/api/UploadArquivo/upload", // webapi url
+                    method: "POST",
+                    data: { fileUploadData: dadosAnexo },
+                    file: $file,
+                    progress: function (e) { }
+                }).then(
+                    function (data, status, headers, config) {
+                        toastr["success"]("Sucesso no envio do arquivo");
+
+                        $scope.NumArquivosTipoDocumento = 0;
+                        FichaSocialService.GetNumArquivosTipoDocumento($scope.GuidFichaSocial, $scope.NomeDocumento).then(function (result) {
+                            $scope.NumArquivosTipoDocumento = result.Data.length;
+                            document.getElementById("arquivo").value = "";
+                            $scope.upload = [];
+                            $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+                        });
+
+                    }, function (error) {
+                        toastr["error"](error.data.returnData);
+
+                        $scope.NumArquivosTipoDocumento = 0;
+                        FichaSocialService.GetNumArquivosTipoDocumento($scope.GuidFichaSocial, $scope.NomeDocumento).then(function (result) {
+                            $scope.NumArquivosTipoDocumento = result.Data.length;
+                            document.getElementById("arquivo").value = "";
+                            $scope.upload = [];
+                            $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+                        });
+                    })
+            );
+            deferred.promise;
+        }
+    }
+
+  
+
+    $scope.abortUpload = function (index) {
+        $scope.upload[index].abort();
+    }
+
+    // Botão: Remover Arquivo
+    $scope.clickBtnRemoverDocumento = function (itemDocumentacao) {
+        if (confirm("Realmente confirma a remoção deste documento?")) {
+            FichaSocialService.RemoverArquivo($scope.GuidFichaSocial ,itemDocumentacao.HandleArquivoDigital).then(function (result) {
+                if (result.Data) {
+                    toastr["success"]("Arquivo removido com sucesso!");
+                }
+                document.getElementById("arquivo").value = "";
+                $scope.upload = [];
+                $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+                FichaSocialService.DesfazerStatusFichaSocial($scope.FichaSocial).then(function (result) {
+                    if (result.Data) {
+                        FichaSocialService.GetFichaSocial($scope.GuidFichaSocial).then(function (result) {
+                            if (result.Data) {
+                                $scope.FichaSocial.Status = result.Data.Status;
+                                $scope.FichaSocial.StatusDescricao = result.Data.StatusDescricao;
+                                toastr["warning"]("Ficha Social: " + $scope.FichaSocial.StatusDescricao);
+                            }
+                        },
+                        function (error) {
+                            alert(error);
+                        });
+                        //location.href = "#/FichaSocial";
+                        //location.reload();
+                    }
+                }, function (resultError) {
+                    alert(resultError.ErrorMessage);
+                });
+            });
+        }
+    };
+
+    // Botão "Visualizar Documentos Enviados"    
+    $scope.clickBtnVisualizarTabDocumentacao = function () {
+        $scope.DocumentacaoArquivos = BuscaArquivosTipoDocumento();
+        $('#modal-VisualizarDocumentosEnviados').modal('show');
+        document.getElementById("arquivo").value = "";
+        $scope.upload = [];
+        $scope.DocumentacaoInscricao = AtualizarDocumentosEnviados();
+    };
+
+    // Botão "Deseja se inscrever no Processo Seletivo"    
+    $scope.clickBtnInscreverProcessoSeletivo = function () {
+        $('#modal-MostrarMensagemFinal').modal('hide');
+        delay(500).then(() => location.href = "#/Vestibular/FichaInscricao");
+    };
+
+    $scope.clickFecharModalFinal = function () {
+        $('#modal-MostrarMensagemFinal').modal('hide');
+        delay(500).then(() => location.href = "#");
+    };
+
+    function delay(time) {
+        return new Promise(resolve => setTimeout(resolve, time));
+    }
+
+    // Botão "Associar Ficha Social ao Meu Processo Seletivo"    
+    $scope.clickBtnAssociarFichaProcessoSeletivo = function () {
+        for (i = 0; i < $scope.InscricaoProcessoSeletivo.length; i++) {
+            FichaSocialService.AtualizarUsarFichaSocialProcessoSeletivo($scope.InscricaoProcessoSeletivo[i].Handle).then(function (result) {
+                if (result.Data) {
+                    toastr["info"]("Ficha Social associada com sucesso a sua Inscrição no Processo Seletivo!");
+                }
+            }, function (resultError) {
+                alert(resultError.ErrorMessage);
+            });
+        }
+    };
+
+    // Botão: Acesso à Ficha Social
+    $scope.clickBtnFichaSocial = function () {
+        location.href = "/GestaoIngressante/#/FichaSocial/FichaInscricao/2";
+    };
+
+} ]);
+
+
+

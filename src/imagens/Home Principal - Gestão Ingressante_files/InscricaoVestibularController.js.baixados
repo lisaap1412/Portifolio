@@ -1,0 +1,1133 @@
+﻿app.controller('InscricaoVestibularController', ['$scope', 'VestibularService', 'CloakService', '$http',
+    function ($scope, VestibularService, CloakService, $http) {
+
+        //$('#quickmenuInscricaoVestibular').hide();
+        $scope.mascaraCEP = '99999-999';
+        $scope.msgInicioInscricao = '';
+        $scope.erros = [];
+        $scope.opcoes = [];
+        $scope.processosAbertos = [];
+        $scope.Pagina = 1;
+        $scope.TotalPaginas = 4;
+        $scope.EhEstrangeiro = false;
+        $scope.AceiteLGPD = false;
+        $scope.AceiteWhatsApp = false;
+        $scope.inscricao = {
+            Nacionalidade: 1,
+            UsarFichaSocial: 'S'
+        };
+        $scope.Redirecionamento = [];
+
+        $("a.scrollToTop").on('click', function (event) {
+            event.preventDefault();
+            $('html,body').animate({
+                scrollTop: 0
+            }, 500);
+        });
+
+        $scope.changeCEP = function () {
+            if ($scope.inscricao.CEP && $scope.inscricao.Nacionalidade == 1) {
+                VestibularService.getCidadePorCEP($scope.inscricao.CEP).then(function (result) {
+                    $scope.cidades = result.Data.Cidades;
+                    if (result.Data.CidadeSelecionada == null) {
+                        $scope.inscricao.UF = 0;
+                        $scope.inscricao.Cidade = 0;
+                    } else {
+                        $scope.inscricao.UF = result.Data.CidadeSelecionada.Estado;
+                        $scope.inscricao.Cidade = result.Data.CidadeSelecionada.Handle;
+                    }
+                });
+            }
+        };
+
+        $scope.changeCPF = function () {
+            $scope.inscricao.HandleFichaSocial = '';
+            $scope.fichaSocial = "";
+        };
+
+        $scope.changeDeficienciaFisica = function () {
+            if (!$scope.inscricao.DeficienciaFisica) {
+                $scope.inscricao.DescricaoDeficienciaFisica = null;
+            }
+        };
+
+        $scope.changeDeficienciaOutra = function () {
+            if (!$scope.inscricao.DeficienciaOutra) {
+                $scope.inscricao.DescricaoDeficienciaOutra = null;
+            }
+        };
+
+        $scope.changeNacionalidade = function () {
+            if ($scope.inscricao.Nacionalidade != 1) {
+                $scope.inscricao.UF = null;
+                $scope.inscricao.Cidade = null;
+                $scope.inscricao.Naturalidade = null;
+                $scope.inscricao.UFNaturalidade = null;
+                $scope.inscricao.UFOrgaoExpedidor = null;
+                $scope.cidades = null;
+                $scope.inscricao.CEP = null;
+                $scope.cidadesNaturalidade = null;
+            } else if ($scope.inscricao.Nacionalidade == 1) {
+                $scope.inscricao.CEP = null;
+                $scope.mascaraCEP = '99999-999';
+                $scope.inscricao.CidadeExterior = null;
+            }
+        };
+
+        $scope.changeNecessitaAtendimentoEspecial = function () {
+            if (!$scope.inscricao.NecessitaAtendimentoEspecial) {
+                $scope.inscricao.DescricaoAtendimentoEspecial = null;
+            }
+        };
+
+        $scope.changePesquisa = function (anSelecionado) {
+            for (i = 0; i < $scope.pesquisas.length; i++) {
+                $scope.pesquisas[i].Selecionado = false;
+            }
+            $scope.pesquisas[anSelecionado].Selecionado = true;
+        }
+
+        $scope.changePesquisaCombo = function () {
+            for (i = 0; i < $scope.pesquisas.length; i++) {
+                $scope.pesquisas[i].Selecionado = false;
+            }
+            $scope.pesquisas[$scope.inscricao.ComoConheceuInatel.ID].Selecionado = true;
+        }
+
+        $scope.changeUF = function () {
+            VestibularService.getCidadesDoEstado($scope.inscricao.UF).then(function (result) {
+                $scope.cidades = result.Data;
+            });
+        };
+
+        $scope.changeUFNaturalidade = function () {
+            VestibularService.getCidadesDoEstado($scope.inscricao.UFNaturalidade).then(function (result) {
+                $scope.cidadesNaturalidade = result.Data;
+            });
+        };
+
+        $scope.changeUsarFichaSocial = function () {
+            if ($scope.inscricao.UsarFichaSocial == "S") {
+                if (typeof $scope.inscricao.CPF == 'undefined' || $scope.inscricao.CPF == '') {
+                    alert('Informe primeiramente o CPF do candidato.');
+                    $scope.inscricao.UsarFichaSocial = '';
+                }
+            }
+            else {
+                $scope.inscricao.HandleFichaSocial = '';
+                $scope.fichaSocial = "";
+            }
+        };
+
+        $scope.clickCidadeInscricaoSelecionada = function (cidadeInscricaoSelecionada) {
+            $scope.cidadeInscricaoSelecionada = cidadeInscricaoSelecionada;
+            $scope.processosAbertosLocalidade = [];
+            $scope.processoInscricaoSelecionado = "";
+
+            VestibularService.getProcessosAbertosPorLocalidade($scope.cidadeInscricaoSelecionada).then(function (result) {
+                if (result.Success) {
+                    $scope.processosAbertosLocalidade = result.Data;
+                    if ($scope.processosAbertosLocalidade.length == 1) {
+                        $scope.processoInscricaoSelecionado = $scope.processosAbertosLocalidade[0];
+                        $scope.clickProcessoInscricaoSelecionado($scope.processoInscricaoSelecionado);
+                    }
+                } else {
+                    if (result.ErrorMessage) {
+                        alert(result.ErrorMessage);
+                    }
+                }
+            });
+        };
+
+        $scope.clickProcessoInscricaoSelecionado = function (processoInscricaoSelecionado) {
+            $scope.processoInscricaoSelecionado = processoInscricaoSelecionado;
+            $scope.inscricao.ProcessoSeletivo = $scope.processoInscricaoSelecionado.Handle;
+            $scope.inscricao.DataVestibular = $scope.processoInscricaoSelecionado.DataVestibularFormatada;
+
+            VestibularService.getLocalidadeListPorProcessoLocalidade($scope.processoInscricaoSelecionado.Handle, $scope.cidadeInscricaoSelecionada).then(function (result) {
+                if (result.Success) {
+                    $scope.inscricao.Localidade = result.Data;
+                } else {
+                    if (result.ErrorMessage) {
+                        alert(result.ErrorMessage);
+                    }
+                }
+            });
+
+            if ($scope.processosAbertos.length > 1) { $scope.getInformacoesInscricaoVestibular() };
+        };
+
+        $scope.clickTipoProva = function (tipoProva) {
+            if (tipoProva == 2) {
+                //alert("Prova on-line não concorre à bolsa mérito.")
+                //$('#modalConfirmarOnline').modal('show');
+            }
+        };
+        $scope.clickModalidadeSelecao = function (modalidadeSelecao) {
+            //1-Vestibular Presencial, 2-Vestibular On-line, 3-Nota do Enem.
+            if (modalidadeSelecao == 3) {
+                $scope.inscricao.TipoProva = null;
+                $('#modalConfirmarEnem').modal('show');
+            } else {
+                $scope.inscricao.TipoProva = modalidadeSelecao;
+                $scope.inscricao.ENEM = false;
+                if ($scope.inscricao.TipoProva == 2) {
+                    $('#modalConfirmarOnline').modal('show');
+                }
+            }
+        };
+        $scope.cancelarModalidade = function () {
+            $scope.modalidadeSeletiva = null;
+            $scope.inscricao.TipoProva = null;
+            $scope.inscricao.ENEM = false;
+            $('#modalConfirmarEnem').modal('hide');
+            $('#modalConfirmarOnline').modal('hide');
+        };
+        $scope.confirmarEnem = function () {
+            $scope.inscricao.ENEM = true;
+            $('#modalConfirmarEnem').modal('hide');
+        };
+        
+        $scope.confirmarInscricaoVestibular = function () {
+            $scope.desabilitarAcoes = true;
+            VestibularService.salvarInscricaoVestibular($scope.inscricao, $scope.cursos, $scope.pesquisas).then(function (result) {
+                $scope.inscricao = result.Data.inscricao;
+                window.location.href = "/GestaoIngressante/Vestibular/InscricaoConcluida?inscricao=" + $scope.inscricao;
+                $scope.desabilitarAcoes = false;
+            });
+        }
+
+        $scope.fecharModalFichaSocial = function () {
+            $('#modalCadastrarFichaSocial').modal('hide');
+        };
+
+        $scope.fecharModalPopupInicial = function () {
+            $('#modal-inicial').modal('hide');
+            if ($scope.processoInscricaoSelecionado != "") {
+                $scope.processoInscricaoUnico = $scope.processoInscricaoSelecionado;
+                $scope.getInformacoesInscricaoVestibular();
+            }
+        };
+
+        $scope.getDadosAlteracoesCadastrais = function () {
+            CloakService.apply('form');
+            $scope.desabilitarAcoes = true;
+
+            VestibularService.getDadosAlteracoesCadastrais(data.inscricaoVestibular).then(function (result) {
+                if (result.Success) {
+                    $scope.inscricao.Nome = result.Data.Inscrito.Nome;
+                    $scope.inscricao.DocumentoIdentidade = result.Data.Inscrito.DocumentoIdentidade;
+                    $scope.inscricao.OrgaoExpedidor = result.Data.Inscrito.OrgaoExpedidor;
+                    $scope.possuiEnem = result.Data.Inscrito.PossuiEnem;
+                    $scope.inscricao.ENEM = result.Data.Inscrito.ENEM;
+                    $scope.inscricao.NumeroENEM = result.Data.Inscrito.NumerosEnem;
+                    $scope.inscricao.ProcessoSeletivo = result.Data.Inscrito.ProcessoSeletivo;
+                    $scope.inscricao.Handle = result.Data.Inscrito.Handle;
+                    $scope.inscricao.InscricaoVestibular = result.Data.Inscrito.InscricaoVestibular;
+                    $scope.inscricao.Email = result.Data.Inscrito.Email;
+                    $scope.inscricao.GUID = result.Data.Inscrito.GUID;
+
+                    $scope.cursos = result.Data.Cursos;
+                    $scope.maiorOpcaoSelecionada = 0;
+                    $scope.opcoesCursoSelecionadas = 0;
+                    $scope.cursosInscrito = result.Data.CursosInscrito;
+                    for (var I = 0; I < $scope.cursosInscrito.length; ++I) {
+                        var opcao = $scope.cursosInscrito[I].Opcao | 0;
+                        $scope.cursos.find('Handle', $scope.cursosInscrito[I].Subcurso).OpcaoSelecionada = $scope.cursosInscrito[I].Opcao;
+                        if (opcao > $scope.maiorOpcaoSelecionada) {
+                            $scope.maiorOpcaoSelecionada = opcao;
+                        }
+                        $scope.opcoesCursoSelecionadas = $scope.opcoesCursoSelecionadas + 1;
+                    }
+
+                    $scope.desabilitarAcoes = false;
+                    CloakService.remove('form');
+                } else {
+                    if (result.ErrorMessage) {
+                        alert(result.ErrorMessage);
+                    }
+                }
+            });
+        };
+
+        $scope.getInformacoesInscricaoVestibular = function () {
+            CloakService.apply('form');
+            $scope.desabilitarAcoes = false;
+
+            VestibularService.getInformacoesInscricaoVestibular($scope.processoInscricaoSelecionado.Handle).then(function (result) {
+                if (result.Success) {
+                    $scope.racas = result.Data.Racas;
+                    $scope.paises = result.Data.Paises;
+                    $scope.cursos = result.Data.Cursos;
+                    $scope.maiorOpcaoSelecionada = 0;
+                    $scope.opcoesCursoSelecionadas = 0;
+                    $scope.estados = result.Data.Estados;
+                    $scope.pesquisas = result.Data.Pesquisas;
+                    $scope.possuiEnem = result.Data.PossuiEnem;
+                    $scope.enemMensagem = result.Data.EnemMensagem;
+                    $scope.localidades = result.Data.Localidades;
+                    $scope.locaisConclusao = result.Data.LocaisConclusao;
+
+                    //$scope.cidadesPromotorias = result.Data.CidadesPromotorias;
+                    $scope.promotores = result.Data.Promotores;
+
+                    $scope.anosEnsinoMedio = result.Data.AnosEnsinoMedio;
+                    //$scope.anosEnsinoMedio.unshift({ Handle: 0, AnoConclusao: "Não concluiu" });
+
+                    $scope.sexos = [
+                        { Value: 'M', Text: 'Masculino' },
+                        { Value: 'F', Text: 'Feminino' }
+                    ];
+                    $scope.linguasEstrangeiras = [
+                        { Value: 1, Text: 'Inglês' },
+                        { Value: 2, Text: 'Espanhol' }
+                    ];
+
+                    if ($scope.possuiEnem == true) {
+                        $scope.modalidadesSeletivas = [
+                            { Value: 3, Text: 'Nota do Enem' },
+                            { Value: 1, Text: 'Prova Presencial' },
+                            { Value: 2, Text: 'Prova On-line' }
+                        ];
+                    } else {
+                        $scope.modalidadesSeletivas = [
+                            { Value: 1, Text: 'Prova Presencial' },
+                            { Value: 2, Text: 'Prova On-line' }
+                        ];
+                    }
+                    $scope.tiposProva = [
+                        { Value: 1, Text: 'Prova Presencial' },
+                        { Value: 2, Text: 'Prova On-line' }
+                    ];
+
+                    getOpcoesCursos();
+
+                    CloakService.remove('form');
+
+                    //if (result.Data.CidadesPromotorias.length > 0) {
+                    //    $('#modal-promotores').modal('show');
+                    //                    }
+                    if (result.Data.Promotores.length > 0) {
+                        $('#modal-promotores').modal('show');
+                    }
+                    //});
+                } else {
+                    if (result.ErrorMessage) {
+                        alert(result.ErrorMessage);
+                    }
+                }
+            });
+        };
+
+        $scope.getLocaisAbertosInscricao = function () {
+            CloakService.apply('form');
+            $scope.desabilitarAcoes = false;
+            $scope.cidadeInscricaoSelecionada = null;
+            $scope.processosAbertosLocalidade = [];
+
+            VestibularService.getLocaisAbertosInscricao().then(function (result) {
+                if (result.Success) {
+                    $scope.locaisAbertosInscricao = result.Data;
+                    $scope.msgInicioInscricao = null;
+
+                    VestibularService.getMensagemInicioInscricao().then(function (result) {
+                        if (result.Success) {
+                            $scope.msgInicioInscricao = result.Data;
+
+                            if ($scope.locaisAbertosInscricao.length == 1) {
+                                $scope.cidadeInscricaoSelecionada = $scope.locaisAbertosInscricao[0].Handle;
+                                $scope.processosAbertosLocalidade = [];
+                                $scope.processoInscricaoSelecionado = "";
+
+                                VestibularService.getProcessosAbertosPorLocalidade($scope.cidadeInscricaoSelecionada).then(function (result) {
+                                    if (result.Success) {
+                                        $scope.processosAbertosLocalidade = result.Data;
+
+                                        if ($scope.processosAbertosLocalidade.length == 1) {
+                                            $scope.processoInscricaoSelecionado = $scope.processosAbertosLocalidade[0];
+                                            $scope.inscricao.ProcessoSeletivo = $scope.processoInscricaoSelecionado.Handle;
+                                            $scope.inscricao.DataVestibular = $scope.processoInscricaoSelecionado.DataVestibularFormatada;
+
+                                            VestibularService.getLocalidadeListPorProcessoLocalidade($scope.inscricao.ProcessoSeletivo, $scope.cidadeInscricaoSelecionada).then(function (result) {
+                                                if (result.Success) {
+                                                    $scope.inscricao.Localidade = result.Data;
+
+                                                    if ($scope.msgInicioInscricao == null) {
+                                                        $scope.getInformacoesInscricaoVestibular();
+                                                    }
+                                                    else {
+                                                        $('#modal-escolhe_processo').modal('show');
+                                                    }
+                                                } else {
+                                                    if (result.ErrorMessage) {
+                                                        alert(result.ErrorMessage);
+                                                    }
+                                                }
+                                            });
+                                        }
+                                        else {
+                                            $('#modal-escolhe_processo').modal('show');
+                                        }
+                                    } else {
+                                        if (result.ErrorMessage) {
+                                            alert(result.ErrorMessage);
+                                        }
+                                    }
+                                });
+                            }
+                            else {
+                                $('#modal-escolhe_processo').modal('show');
+                            }
+
+                            CloakService.remove('form');
+                        } else {
+                            if (result.ErrorMessage) {
+                                alert(result.ErrorMessage);
+                            }
+                        }
+                    });
+                } else {
+                    if (result.ErrorMessage) {
+                        alert(result.ErrorMessage);
+                    }
+                }
+            });
+        };
+
+        $scope.getLocaisPSsAbertosInscricao = function () {
+            CloakService.apply('form');
+            $scope.desabilitarAcoes = false;
+            $scope.cidadeInscricaoSelecionada = null;
+            $scope.processosAbertosLocalidade = [];
+            $scope.processosAbertos = [];
+
+            VestibularService.getDadosPessoaCorrente().then(function (result) {
+                if (result.Success) {
+                    $scope.pessoaCorrente = result.Data.PessoaCorrente;
+                    $scope.inscricao.CPF = $scope.pessoaCorrente.CPF;
+                    $scope.inscricao.Email = $scope.pessoaCorrente.Email;
+                    $scope.inscricao.Nome = $scope.pessoaCorrente.Nome;
+                    $scope.inscricao.DataNascimento = $scope.pessoaCorrente.DataNascimentoStr;
+                    $scope.inscricao.Nacionalidade = $scope.pessoaCorrente.Nacionalidade;
+
+                    VestibularService.getLocaisAbertosInscricao().then(function (result) {
+                        if (result.Success) {
+                            $scope.locaisAbertosInscricao = result.Data;
+                            $scope.msgInicioInscricao = null;
+
+                            VestibularService.getMensagemInicioInscricao().then(function (result) {
+                                if (result.Success) {
+                                    $scope.msgInicioInscricao = result.Data;
+
+                                    if ($scope.locaisAbertosInscricao.length == 1) {
+                                        $scope.cidadeInscricaoSelecionada = $scope.locaisAbertosInscricao[0].Handle;
+                                        $scope.processosAbertosLocalidade = [];
+                                        $scope.processosAbertos = [];
+                                        $scope.processoInscricaoSelecionado = "";
+
+                                        VestibularService.getProcessosAbertosPorLocalidade($scope.cidadeInscricaoSelecionada).then(function (result) {
+                                            if (result.Success) {
+                                                $scope.processosAbertosLocalidade = result.Data;
+                                                $scope.processosAbertos = result.Data;
+
+                                                if ($scope.processosAbertosLocalidade.length == 1) {
+                                                    $scope.processoInscricaoSelecionado = $scope.processosAbertosLocalidade[0];
+                                                    $scope.inscricao.ProcessoSeletivo = $scope.processoInscricaoSelecionado.Handle;
+                                                    $scope.inscricao.DataVestibular = $scope.processoInscricaoSelecionado.DataVestibularFormatada;
+
+                                                    VestibularService.getLocalidadeListPorProcessoLocalidade($scope.inscricao.ProcessoSeletivo, $scope.cidadeInscricaoSelecionada).then(function (result) {
+                                                        if (result.Success) {
+                                                            $scope.inscricao.Localidade = result.Data;
+                                                            $('#modal-inicial').modal('show');
+                                                            CloakService.remove('form');
+                                                        } else {
+                                                            if (result.ErrorMessage) {
+                                                                alert(result.ErrorMessage);
+                                                            }
+                                                        }
+                                                    });
+                                                }
+                                                else {
+                                                    $('#modal-inicial').modal('show');
+                                                    CloakService.remove('form');
+                                                }
+                                            } else {
+                                                if (result.ErrorMessage) {
+                                                    alert(result.ErrorMessage);
+                                                }
+                                            }
+                                        });
+                                    }
+                                    else {
+                                        //Verificando se processo seletivo único em aberto.
+                                        $scope.processosAbertos = [];
+                                        $scope.processoInscricaoSelecionado = "";
+
+                                        VestibularService.getProcessosSeletivosAbertos().then(function (result) {
+                                            if (result.Success) {
+                                                $scope.processosAbertos = result.Data;
+
+                                                if ($scope.processosAbertos.length == 1) {
+                                                    $scope.processoInscricaoSelecionado = $scope.processosAbertos[0];
+                                                    $scope.inscricao.ProcessoSeletivo = $scope.processoInscricaoSelecionado.Handle;
+                                                    $scope.inscricao.DataVestibular = $scope.processoInscricaoSelecionado.DataVestibularFormatada;
+                                                }
+
+                                                $('#modal-inicial').modal('show');
+                                                CloakService.remove('form');
+                                            } else {
+                                                if (result.ErrorMessage) {
+                                                    alert(result.ErrorMessage);
+                                                }
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    if (result.ErrorMessage) {
+                                        alert(result.ErrorMessage);
+                                    }
+                                }
+                            });
+                        } else {
+                            if (result.ErrorMessage) {
+                                alert(result.ErrorMessage);
+                            }
+                        }
+                    });
+                } else {
+                    if (result.ErrorMessage) {
+                        alert(result.ErrorMessage);
+                    }
+                }
+            });
+        };
+
+        $scope.integrarRDStation = function () {
+            //Fará a integração com a plataforma RD Station.
+            var IDENTIFICADOR = 'form-vest-' + $scope.inscricao.DataVestibular.substr(0, 2) + $scope.inscricao.DataVestibular.substr(3, 2) + $scope.inscricao.DataVestibular.substr(8, 2);
+            var TOKEN = 'fab2c64ee89d7e2d41e83190d0399b16';
+            var form = $('#top');
+            var inputDataVestibular = $scope.inscricao.DataVestibular;
+            var inputNome = form.find('input[name="nome"]');
+            var inputEmail = form.find('input[name="email"]');
+            var inputCPF = form.find('input[name="CPF"]');
+            var inputDataNascimento = form.find('input[name="dataNascimento"]');
+            var inputIdade = Calcular_Idade(inputDataNascimento.val());
+            var inputCelular = form.find('input[name="celular"]');
+            var inputTelefone = form.find('input[name="telefone"]');
+            var inputNomeResponsavel = form.find('input[name="nomeResponsavel"]');
+            var inputEmailResponsavel = form.find('input[name="emailResponsavel"]');
+            var inputTelefoneResponsavel = form.find('input[name="telefoneResponsavel"]');
+
+            var cursoPrimeiraOpcao = $scope.cursos.filter(function (curso) {
+                return curso.OpcaoSelecionada == 1;
+            });
+            var inputCursoPrimeiraOpcao = cursoPrimeiraOpcao[0].DescricaoSemHtml;
+
+            var data_array = [
+                { name: 'identificador', value: IDENTIFICADOR },
+                { name: 'token_rdstation', value: TOKEN },
+                { name: 'email', value: inputEmail.val() },
+                { name: 'nome', value: inputNome.val() },
+                { name: 'CPF', value: inputCPF.val() },
+                { name: 'idade', value: inputIdade },
+                { name: 'celular', value: inputCelular.val() },
+                { name: 'telefone', value: inputTelefone.val() },
+                { name: 'Nome do responsável', value: inputNomeResponsavel.val() },
+                { name: 'Email do responsável', value: inputEmailResponsavel.val() },
+                { name: 'Telefone do responsável', value: inputTelefoneResponsavel.val() },
+                { name: 'Curso primeira opção', value: inputCursoPrimeiraOpcao },
+                { name: 'data-vestibular', value: inputDataVestibular },
+            ];
+
+            //Caso quiser que a página seja redirecionada somente após completar a integração com o RD Station. 
+            //RdIntegration.post(data_array, function () {
+            window.location.href = $scope.Redirecionamento.RedirectTo;
+            //});
+        }
+
+        $scope.limparFormularioInscricaoVestibular = function () {
+            if (confirm("Você está prestes a limpar o formulário de inscrição no vestibular. O processo não poderá ser desfeito.")) {
+                for (var I = 0; I < $scope.pesquisas.length; ++I) {
+                    $scope.pesquisas[I].Selecionado = false;
+                }
+                //Forçando a limpeza para input do tipo rádio.
+                for (i = 0; i < comoConheceuInatel.length; i++) {
+                    comoConheceuInatel[i].checked = false;
+                }
+
+                if (typeof $scope.deficiencias != 'undefined') {
+                    for (var I = 0; I < $scope.deficiencias.length; ++I) {
+                        $scope.deficiencias[I].Descricao = '';
+                        $scope.deficiencias[I].Selecionado = false;
+                    }
+                }
+
+                //Incluído por Luziana em 16/10/2017 por estar perdendo os campos abaixos quando da limpeza do formulário.
+                $scope.copia = {};
+                $scope.copia.ProcessoSeletivo = $scope.inscricao.ProcessoSeletivo;
+                $scope.copia.DataVestibular = $scope.inscricao.DataVestibular;
+                $scope.copia.Localidade = $scope.inscricao.Localidade;
+
+                $scope.inscricao = {
+                    Naturalidade: 1
+                };
+                $scope.inscricao.ProcessoSeletivo = $scope.copia.ProcessoSeletivo;
+                $scope.inscricao.DataVestibular = $scope.copia.DataVestibular;
+                $scope.inscricao.Localidade = $scope.copia.Localidade;
+            }
+        };
+
+        $scope.limparOpcoesCursos = function () {
+            if (confirm("Deseja realmente limpar a seleção de cursos?")) {
+                for (var I = 0; I < $scope.cursos.length; ++I) {
+                    $scope.cursos[I].OpcaoSelecionada = -1;
+                }
+                $scope.maiorOpcaoSelecionada = 0;
+                $scope.opcoesCursoSelecionadas = 0;
+                getOpcoesCursos();
+            }
+        };
+
+        $scope.limparPaginaInscricaoVestibular = function () {
+            if (confirm("Você está prestes a limpar os dados preenchidos nessa página. O processo não poderá ser desfeito.")) {
+
+                if ($scope.Pagina == 1) {
+                    $scope.inscricao.ENEM = null;
+                    $scope.inscricao.NumeroENEM = null;
+                    $scope.inscricao.ParticipanteTreineiro = null;
+                    $scope.inscricao.AnoEnsinoMedio = null;
+                    $scope.inscricao.LocalConclusao = null;
+                    $scope.inscricao.DescricaoLocalConclusao = null;
+                    $scope.modalidadeSeletiva = null;
+                    $scope.inscricao.TipoProva = null;
+                }
+
+                if ($scope.Pagina == 2) {
+                    $scope.inscricao.Nome = null;
+                    $scope.inscricao.NomeSocial = null;
+                    $scope.inscricao.Sexo = null;
+                    $scope.inscricao.DataNascimento = null;
+                    $scope.inscricao.Nacionalidade = null;
+                    $scope.inscricao.DocumentoIdentidade = null;
+                    $scope.inscricao.OrgaoExpedidor = null;
+                    $scope.inscricao.UFOrgaoExpedidor = null;
+                    $scope.inscricao.UFNaturalidade = null;
+                    $scope.inscricao.Naturalidade = null;
+                    $scope.inscricao.CPF = null;
+                    $scope.inscricao.Raca = null;
+                    $scope.inscricao.PossuiDeficiencia = null;
+                    $scope.inscricao.NecessitaAtendimentoEspecial = null;
+                    $scope.inscricao.DescricaoAtendimentoEspecial = null;
+                    $scope.inscricao.DeficienciaFisica = null;
+                    $scope.inscricao.DescricaoDeficienciaFisica = null;
+                    $scope.inscricao.DeficienciaVisual = null;
+                    $scope.inscricao.DeficienciaBaixaVisao = null;
+                    $scope.inscricao.DeficienciaAuditiva = null;
+                    $scope.inscricao.DeficienciaSurdoCegueira = null;
+                    $scope.inscricao.DeficienciaMultipla = null;
+                    $scope.inscricao.DeficienciaMental = null;
+                    $scope.inscricao.DeficienciaNaoDeclarada = null;
+                    $scope.inscricao.DeficienciaOutra = null;
+                    $scope.inscricao.DescricaoDeficienciaOutra = null;
+
+                    if (typeof $scope.deficiencias != 'undefined') {
+                        for (var I = 0; I < $scope.deficiencias.length; ++I) {
+                            $scope.deficiencias[I].Descricao = '';
+                            $scope.deficiencias[I].Selecionado = false;
+                        }
+                    }
+
+                    $scope.inscricao.Celular = null;
+                    $scope.inscricao.Telefone = null;
+                }
+
+                if ($scope.Pagina == 3) {
+                    $scope.inscricao.CEP = null;
+                    $scope.inscricao.CidadeExterior = null;
+                    $scope.inscricao.UF = null;
+                    $scope.inscricao.Cidade = null;
+                    $scope.inscricao.NomeResponsavel = null;
+                    $scope.inscricao.EmailResponsavel = null;
+                    $scope.inscricao.TelefoneResponsavel = null;
+                    $scope.inscricao.Endereco = null;
+                    $scope.inscricao.Numero = null;
+                    $scope.inscricao.Complemento = null;
+                    $scope.inscricao.Bairro = null;
+                    $scope.inscricao.ComoConheceuInatel = null;
+
+                    for (var I = 0; I < $scope.pesquisas.length; ++I) {
+                        $scope.pesquisas[I].Selecionado = false;
+                    }
+                    //Forçando a limpeza para input do tipo rádio.
+                    //for (i = 0; i < comoConheceuInatel.length; i++) {
+                    //    comoConheceuInatel[i].checked = false;
+                    //}
+                }
+            }
+        };
+
+        $scope.mostrarModalConfirmacao = function (cancelarTreineiro) {
+            if (cancelarTreineiro) {
+                $scope.inscricao.ParticipanteTreineiro = false;
+            }
+
+            var deficiencias = [];
+            if ($scope.inscricao.NecessitaAtendimentoEspecial == 'true') {
+                deficiencias.push('Necessita atendimento especial (' + $scope.inscricao.DescricaoAtendimentoEspecial + ')');
+            }
+            if ($scope.inscricao.DeficienciaFisica) {
+                deficiencias.push('Deficiência física (' + $scope.inscricao.DescricaoDeficienciaFisica + ')');
+            }
+            if ($scope.inscricao.DeficienciaVisual) {
+                deficiencias.push('Cegueira');
+            }
+            if ($scope.inscricao.DeficienciaBaixaVisao) {
+                deficiencias.push('Baixa-visão');
+            }
+            if ($scope.inscricao.DeficienciaAuditiva) {
+                deficiencias.push('Deficiência Auditiva');
+            }
+            if ($scope.inscricao.DeficienciaSurdoCegueira) {
+                deficiencias.push('Surdo-cegueira');
+            }
+            if ($scope.inscricao.DeficienciaMultipla) {
+                deficiencias.push('Deficiência múltipla');
+            }
+            if ($scope.inscricao.DeficienciaMental) {
+                deficiencias.push('Deficiência mental');
+            }
+            if ($scope.inscricao.DeficienciaOutra) {
+                deficiencias.push($scope.inscricao.DescricaoDeficienciaOutra);
+            }
+            if ($scope.inscricao.DeficienciaNaoDeclarada && deficiencias.length == 0) {
+                deficiencias.push('Não declarada');
+            }
+
+            var pesquisasSelecionadas = $scope.pesquisas.findAll('Selecionado', true);
+            var pesquisas = [];
+            for (var I = 0; I < pesquisasSelecionadas.length; ++I) {
+                pesquisas.push(pesquisasSelecionadas[I].Nome);
+            }
+
+            $scope.informacoes = {
+                DataVestibular: $scope.inscricao.DataVestibular,
+                CPF: $scope.inscricao.CPF,
+                Email: $scope.inscricao.Email,
+                Pesquisas: pesquisas.join(', '),
+                Celular: $scope.inscricao.Celular,
+                Telefone: $scope.inscricao.Telefone,
+                NomeSocial: $scope.inscricao.NomeSocial,
+                NumeroENEM: $scope.inscricao.NumeroENEM,
+                ENEM: $scope.inscricao.ENEM ? "SIM" : null,
+                UsarFichaSocial: $scope.inscricao.UsarFichaSocial == 'S' ? "SIM" : "NÃO",
+                OrgaoExpedidor: $scope.inscricao.OrgaoExpedidor,
+                NomeResponsavel: $scope.inscricao.NomeResponsavel,
+                EmailResponsavel: $scope.inscricao.EmailResponsavel,
+                LocalConclusao: $scope.inscricao.LocalConclusao.Nome,
+                DocumentoIdentidade: $scope.inscricao.DocumentoIdentidade,
+                DataNascimento: $scope.inscricao.DataNascimento.toDateTime(),
+                Raca: $scope.racas.find('Handle', $scope.inscricao.Raca).Nome,
+                /*LocalidadeProva: $scope.processoInscricaoSelecionado.TabModalidade == 2 ? "Prova on-line" : $scope.inscricao.Localidade.EnderecoCompleto,*/
+                LocalidadeProva: $scope.inscricao.TipoProva == 2 ? "Prova on-line" : $scope.inscricao.Localidade.EnderecoCompleto,
+                DescricaoLocalConclusao: $scope.inscricao.DescricaoLocalConclusao,
+                PossuiDeficiencia: $scope.inscricao.PossuiDeficiencia == 2 ? true : false,
+                ParticipanteTreineiro: $scope.inscricao.ParticipanteTreineiro ? "SIM" : null,
+                Nacionalidade: $scope.paises.find('Handle', $scope.inscricao.Nacionalidade).Nome,
+                UFNaturalidade: $scope.inscricao.UFNaturalidade == null ? null : $scope.estados.find('Handle', $scope.inscricao.UFNaturalidade).Sigla,
+                Deficiencias: $scope.inscricao.PossuiDeficiencia == 2 ? deficiencias.join(', ') : null,
+                UFOrgaoExpedidor: $scope.inscricao.UFOrgaoExpedidor == null ? null : $scope.estados.find('Handle', $scope.inscricao.UFOrgaoExpedidor).Sigla,
+                Naturalidade: $scope.inscricao.Naturalidade == null ? null : $scope.cidadesNaturalidade.find('Handle', $scope.inscricao.Naturalidade).Nome,
+                Nome: $scope.inscricao.Nome + ' (' + $scope.sexos.find('Value', $scope.inscricao.Sexo).Text + ')',
+                TipoProva: $scope.tiposProva.find('Value', $scope.inscricao.TipoProva).Text,
+                AnoEnsinoMedio: $scope.anosEnsinoMedio.find('Handle', $scope.inscricao.AnoEnsinoMedio).AnoConclusao,
+                CursosSelecionados: $scope.cursos.findAllNot('OpcaoSelecionada', [0, -1]).orderBy('OpcaoSelecionada'),
+                CidadeExterior: $scope.inscricao.CidadeExterior == null ? null : $scope.inscricao.CidadeExterior,
+
+                Endereco: $scope.inscricao.Endereco + ', ' + $scope.inscricao.Numero +
+                    ($scope.inscricao.Complemento ? ' (' + $scope.inscricao.Complemento + ')' : '') +
+                    ' - ' + $scope.inscricao.Bairro + ' - ' + $scope.inscricao.CEP,
+
+                //Endereco: $scope.inscricao.CEP,
+
+                Cidade: $scope.inscricao.Cidade == null ? null : $scope.cidades.find('Handle', $scope.inscricao.Cidade).Nome + ' (' +
+                    $scope.estados.find('Handle', $scope.inscricao.UF).Sigla + ')'
+            };
+
+            $('#modalConfirmarTreineiro').modal('hide');
+            $scope.desabilitarAcoes = false;
+            $('#modalConfirmarInscricao').modal('show');
+        };
+
+        $scope.posicionarPaginaSobreErro = function () {
+            var elementoParaPosicionar = $("#grupo" + $scope.erros.min('Grupo'));
+            $('html, body').animate({
+                scrollTop: elementoParaPosicionar.offset().top - elementoParaPosicionar.height()
+            });
+        };
+
+        $scope.salvaAlteracoesCadastrais = function (inscricao, cursos) {
+            $scope.desabilitarAcoes = true;
+            VestibularService.salvarAlteracoesCadastrais(inscricao, cursos).then(function (result) {
+                //alert("Alterações salvas!\nFazer o download da 2ª via da ficha de inscrição para o vestibular.");
+                alert("Alterações salvas!");
+                window.location.href = "../Vestibular/Inscricao?inscricao=" + inscricao.GUID;
+                $scope.desabilitarAcoes = false;
+            });
+        };
+
+        $scope.selecionouCursoOpcao = function (opcaoCurso, cursoSelecionado) {
+            if (cursoSelecionado == "") {
+                $scope.opcoesCursoSelecionadas = $scope.opcoesCursoSelecionadas + 1;
+            } else {
+                for (var i = 0; i < $scope.cursos.length; ++i) {
+                    if ($scope.cursos[i].Handle == cursoSelecionado) {
+                        $scope.cursos[i].OpcaoSelecionada = opcaoCurso;
+                        $scope.opcoesCursoSelecionadas = $scope.opcoesCursoSelecionadas + 1;
+                        i = $scope.cursos.length;
+                    }
+                }
+            }
+            $scope.maiorOpcaoSelecionada = getMaiorOpcaoSelecionada();
+        };
+
+        $scope.selecionouOpcaoCurso = function () {
+            getOpcoesCursos();
+        };
+
+        $scope.submitAlteracoesCadastrais = function () {
+            $scope.erros = $scope.validaAlteracoesCadastrais($scope.inscricao, $scope.opcoesCursoSelecionadas);
+            if ($scope.erros.length == 0) {
+                if ($scope.inscricao.DocumentoIdentidade) {
+                    VestibularService.validarAlteracoesCadastrais($scope.inscricao).then(function (result) {
+                        if (result.Data.length > 0) {
+                            for (var I = 0; I < result.Data.length; ++I) {
+                                var item = result.Data[I];
+                                $scope.erros.push({ Grupo: item.Grupo, Para: item.Para, Descricao: item.Descricao });
+                            }
+                        } else {
+                            $scope.salvaAlteracoesCadastrais($scope.inscricao, $scope.cursos);
+                        }
+                    }, function (mensagemErro) {
+                        alert(mensagemErro);
+                    });
+                } else {
+                    $scope.salvaAlteracoesCadastrais($scope.inscricao, $scope.cursos);
+                }
+            }
+        };
+
+        $scope.submitInscricaoComPaginas = function () {
+            if (!$scope.cidadeInscricaoSelecionada) {
+                $scope.erros.push({ Grupo: 1, Para: 'Localidade', Descricao: 'Escolha o local onde você fará a prova.' });
+            } else if (!$scope.processoInscricaoSelecionado) {
+                $scope.erros.push({ Grupo: 1, Para: 'ProcessoSeletivo', Descricao: 'Escolha o processo seletivo que deseja se inscrever.' });
+            } else {
+                $scope.informacoes = null;
+                $scope.erros = $scope.validaInscricaoPorPagina();
+                if ($scope.erros.length == 0) {
+                    if ($scope.Pagina == 1) {
+                        $scope.Pagina = 2;
+                    } else if ($scope.Pagina == 2) {
+                        if ($scope.inscricao.DataNascimento || $scope.inscricao.DocumentoIdentidade ||
+                            $scope.inscricao.CPF) {
+                            //Lógica alterada pelo Clayton em 16/02/2022.
+                            VestibularService.validarInscricaoPagina2($scope.inscricao).then(function (result) {
+                                if (result.Data.length > 0) {
+                                    for (var I = 0; I < result.Data.length; ++I) {
+                                        var item = result.Data[I];
+                                        $scope.erros.push({ Grupo: item.Grupo, Para: item.Para, Descricao: item.Descricao });
+                                    }
+                                } else {
+                                    $scope.Pagina = 3;
+                                }
+                            }, function (mensagemErro) {
+                                alert(mensagemErro);
+                            });
+                        } else {
+                            $scope.Pagina = $scope.Pagina + 1;
+                        }
+                    } else if ($scope.Pagina == 3) {
+                        if ($scope.inscricao.EmailResponsavel) {
+                            //Lógica alterada pelo Clayton em 16/02/2022.
+                            VestibularService.validarInscricaoPagina3($scope.inscricao).then(function (result) {
+                                if (result.Data.length > 0) {
+                                    for (var I = 0; I < result.Data.length; ++I) {
+                                        var item = result.Data[I];
+                                        $scope.erros.push({ Grupo: item.Grupo, Para: item.Para, Descricao: item.Descricao });
+                                    }
+                                } else {
+                                    if ($scope.inscricao.ParticipanteTreineiro) {
+                                        $('#modalConfirmarTreineiro').modal('show');
+                                    } else {
+                                        $scope.mostrarModalConfirmacao();
+                                    }
+                                }
+                            }, function (mensagemErro) {
+                                alert(mensagemErro);
+                            });
+                        } else {
+                            if ($scope.inscricao.ParticipanteTreineiro) {
+                                $('#modalConfirmarTreineiro').modal('show');
+                            } else {
+                                $scope.mostrarModalConfirmacao();
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        $scope.submitInscricaoVestibular = function () {
+            $scope.informacoes = null;
+            $scope.erros = VestibularService.validarInscricaoVestibular($scope.inscricao, $scope.cursos, $scope.pesquisas, $scope.opcoesCursoSelecionadas);
+
+            if ($scope.erros.length == 0) {
+                if ($scope.inscricao.ParticipanteTreineiro) {
+                    $('#modalConfirmarTreineiro').modal('show');
+                } else {
+                    $scope.mostrarModalConfirmacao();
+                }
+            }
+        };
+
+        $scope.validaAlteracoesCadastrais = function (inscricao, opcoesCursoSelecionadas) {
+            var validacao = [];
+            if (opcoesCursoSelecionadas < 2) {
+                validacao.push({ Grupo: 1, Para: 'Cursos', Descricao: 'Selecione ao menos duas opções de curso.' });
+            }
+            if (inscricao.ENEM && (!inscricao.NumeroENEM || inscricao.NumeroENEM.length != 12)) {
+                validacao.push({ Grupo: 1, Para: 'NumeroENEM', Descricao: 'Digite o código do ENEM com 12 números.' });
+            }
+            if (!inscricao.Nome) {
+                validacao.push({ Grupo: 2, Para: 'Nome', Descricao: 'Digite o nome do candidato.' });
+            }
+            if (!inscricao.DocumentoIdentidade) {
+                validacao.push({ Grupo: 2, Para: 'DocumentoIdentidade', Descricao: 'Digite o documento de identidade do candidato.' });
+            }
+            if (!inscricao.OrgaoExpedidor) {
+                validacao.push({ Grupo: 2, Para: 'OrgaoExpedidor', Descricao: 'Digite o órgão expedidor do documento de identidade.' });
+            }
+            return validacao;
+        };
+
+        $scope.validaInformacoesPopupInicial = function () {
+            VestibularService.validarInscricaoCpfEmail($scope.inscricao).then(function (result) {
+                if (result.Data.length > 0) {
+                    errosPopup = "";
+                    for (var I = 0; I < result.Data.length; ++I) {
+                        errosPopup = errosPopup + result.Data[I].Descricao + " \n";
+                    }
+                    alert(errosPopup);
+                } else {
+                    $('#modal-inicial').modal('hide');
+                    if ($scope.processoInscricaoSelecionado != "") {
+                        $scope.processoInscricaoUnico = $scope.processoInscricaoSelecionado;
+                        $scope.getInformacoesInscricaoVestibular();
+                    }
+                }
+            }, function (mensagemErro) {
+                alert(mensagemErro);
+            });
+        };
+
+        $scope.validaInscricaoPorPagina = function () {
+            validacao = [];
+            if ($scope.Pagina == 1) {
+                if (!$scope.inscricao.TipoProva) {
+                    validacao.push({ Grupo: 1, Para: 'TipoProva', Descricao: 'Escolha a modalidade de prova que utilizará.' });
+                }
+                if ($scope.inscricao.ENEM && (!$scope.inscricao.NumeroENEM || $scope.inscricao.NumeroENEM.length != 12)) {
+                    validacao.push({ Grupo: 1, Para: 'NumeroENEM', Descricao: 'Digite o código do ENEM com 12 números.' });
+                }
+                if (!$scope.inscricao.Localidade) {
+                    validacao.push({ Grupo: 1, Para: 'Localidade', Descricao: 'Escolha o local onde você fará a prova.' });
+                }
+                if (!$scope.inscricao.ProcessoSeletivo) {
+                    validacao.push({ Grupo: 1, Para: 'ProcessoSeletivo', Descricao: 'Escolha o processo seletivo que deseja se inscrever.' });
+                }
+                if ($scope.opcoesCursoSelecionadas < 2) {
+                    validacao.push({ Grupo: 1, Para: 'Cursos', Descricao: 'Selecione ao menos duas opções de curso.' });
+                }
+                //if ($scope.inscricao.ENEM && (!$scope.inscricao.NumeroENEM || $scope.inscricao.NumeroENEM.length != 12)) {
+                //    validacao.push({ Grupo: 1, Para: 'NumeroENEM', Descricao: 'Digite o código do ENEM com 12 números.' });
+                //}
+                if ($scope.inscricao.AnoEnsinoMedio == null) {
+                    validacao.push({ Grupo: 1, Para: 'AnoEnsinoMedio', Descricao: 'Escolha o ano de conclusão do Ensino Médio.' });
+                }
+                if (!$scope.inscricao.LocalConclusao) {
+                    validacao.push({ Grupo: 1, Para: 'LocalConclusao', Descricao: 'Escolha o local de conclusão do Ensino Médio.' });
+                } else if ($scope.inscricao.LocalConclusao.NecessitaDescricao && !$scope.inscricao.DescricaoLocalConclusao) {
+                    validacao.push({ Grupo: 1, Para: 'DescricaoLocalConclusao', Descricao: 'Descreva o local de conclusão do Ensino Médio.' });
+                }
+            }
+            else if ($scope.Pagina == 2) {
+                if (!$scope.inscricao.Nome) {
+                    validacao.push({ Grupo: 2, Para: 'Nome', Descricao: 'Digite o nome do candidato.' });
+                }
+                if (!$scope.inscricao.Sexo) {
+                    validacao.push({ Grupo: 2, Para: 'Sexo', Descricao: 'Escolha o sexo do candidato.' });
+                }
+                if (!$scope.inscricao.DataNascimento) {
+                    validacao.push({ Grupo: 2, Para: 'DataNascimento', Descricao: 'Digite a data de nascimento do candidato.' });
+                }
+                if (!$scope.inscricao.Nacionalidade) {
+                    validacao.push({ Grupo: 2, Para: 'Nacionalidade', Descricao: 'Escolha a nacionalidade do candidato.' });
+                }
+                if (!$scope.inscricao.DocumentoIdentidade) {
+                    validacao.push({ Grupo: 2, Para: 'DocumentoIdentidade', Descricao: 'Digite o documento de identidade do candidato.' });
+                }
+                if (!$scope.inscricao.OrgaoExpedidor) {
+                    validacao.push({ Grupo: 2, Para: 'OrgaoExpedidor', Descricao: 'Digite o órgão expedidor do documento de identidade.' });
+                }
+                if ($scope.inscricao.Nacionalidade == 1) {
+                    if (!$scope.inscricao.UFOrgaoExpedidor) {
+                        validacao.push({ Grupo: 2, Para: 'UFOrgaoExpedidor', Descricao: 'Escolha a UF do órgão expedidor do documento de identidade.' });
+                    }
+                    if (!$scope.inscricao.UFNaturalidade) {
+                        validacao.push({ Grupo: 2, Para: 'UFNaturalidade', Descricao: 'Escolha a UF da naturalidade do candidato.' });
+                    }
+                    if (!$scope.inscricao.Naturalidade) {
+                        validacao.push({ Grupo: 2, Para: 'Naturalidade', Descricao: 'Escolha a naturalidade do candidato.' });
+                    }
+                    if (!$scope.inscricao.CPF) {
+                        validacao.push({ Grupo: 2, Para: 'CPF', Descricao: 'Digite o CPF do candidato.' });
+                    }
+                }
+                if (!$scope.inscricao.Raca) {
+                    validacao.push({ Grupo: 2, Para: 'Raca', Descricao: 'Escolha a raça do candidato.' });
+                }
+                if (!$scope.inscricao.PossuiDeficiencia) {
+                    validacao.push({ Grupo: 2, Para: 'PossuiDeficiencia', Descricao: 'Escolha se você possui deficiência ou não.' });
+                }
+                if ($scope.inscricao.PossuiDeficiencia == 2) {
+                    if (!$scope.inscricao.DeficienciaMental && !$scope.inscricao.DeficienciaNaoDeclarada && !$scope.inscricao.DeficienciaMultipla && !$scope.inscricao.DeficienciaSurdoCegueira &&
+                        !$scope.inscricao.DeficienciaAuditiva && !$scope.inscricao.DeficienciaBaixaVisao && !$scope.inscricao.DeficienciaVisual && !$scope.inscricao.DeficienciaFisica &&
+                        !$scope.inscricao.DeficienciaOutra) {
+                        validacao.push({ Grupo: 2, Para: 'PossuiDeficiencia', Descricao: 'Selecione ao menos uma deficiência da lista de deficiências.' });
+                    }
+                    console.log($scope.inscricao.NecessitaAtendimentoEspecial);
+                    if (!$scope.inscricao.NecessitaAtendimentoEspecial) {
+                        validacao.push({ Grupo: 2, Para: 'NecessitaAtendimentoEspecial', Descricao: 'Escolha se você precisa de atendimento especial ou não.' });
+                    }
+                    if ($scope.inscricao.NecessitaAtendimentoEspecial === "true" && !$scope.inscricao.DescricaoAtendimentoEspecial) {
+                        validacao.push({ Grupo: 2, Para: 'DescricaoAtendimentoEspecial', Descricao: 'Descreva o atendimento especial o qual o candidato necessita.' });
+                    }
+                    if ($scope.inscricao.DeficienciaFisica && !$scope.inscricao.DescricaoDeficienciaFisica) {
+                        validacao.push({ Grupo: 2, Para: 'DescricaoDeficienciaFisica', Descricao: 'Descreva a deficiência física do candidato.' });
+                    }
+                    if ($scope.inscricao.DeficienciaOutra && !$scope.inscricao.DescricaoDeficienciaOutra) {
+                        validacao.push({ Grupo: 2, Para: 'DescricaoDeficienciaOutra', Descricao: 'Descreva a deficiência do candidato.' });
+                    }
+                }
+                if (!$scope.inscricao.Celular) {
+                    validacao.push({ Grupo: 2, Para: 'Celular', Descricao: 'Digite o celular do candidato.' });
+                } else {
+                    if ($scope.inscricao.Celular.length != 11) {
+                        validacao.push({ Grupo: 2, Para: 'Celular', Descricao: 'Digite o celular do candidato com 11 números.' });
+                    }
+                }
+            }
+            else if ($scope.Pagina == 3) {
+                if (!$scope.inscricao.Endereco) {
+                    validacao.push({ Grupo: 3, Para: 'Endereco', Descricao: 'Digite o endereço do candidato.' });
+                }
+                if (!$scope.inscricao.Numero) {
+                    validacao.push({ Grupo: 3, Para: 'Numero', Descricao: 'Digite o número do endereço do candidato.' });
+                }
+                if (!$scope.inscricao.Bairro) {
+                    validacao.push({ Grupo: 3, Para: 'Bairro', Descricao: 'Digite o bairro do endereço do candidato.' });
+                }
+                if (!$scope.inscricao.CEP) {
+                    validacao.push({ Grupo: 3, Para: 'CEP', Descricao: 'Digite o CEP do endereço do candidato.' });
+                }
+                if ($scope.inscricao.Nacionalidade == 1) {
+                    if (!$scope.inscricao.UF) {
+                        validacao.push({ Grupo: 3, Para: 'UF', Descricao: 'Escolha a UF do endereço do candidato.' });
+                    }
+                    if (!$scope.inscricao.Cidade) {
+                        validacao.push({ Grupo: 3, Para: 'Cidade', Descricao: 'Escolha a cidade do endereço do candidato.' });
+                    }
+                } else {
+                    if (!$scope.inscricao.CidadeExterior) {
+                        validacao.push({ Grupo: 3, Para: 'CidadeExterior', Descricao: 'Escolha a cidade do exterior do candidato.' });
+                    }
+                }
+                if (!$scope.inscricao.NomeResponsavel) {
+                    validacao.push({ Grupo: 3, Para: 'NomeResponsavel', Descricao: 'Digite o nome do responsável pelo candidato.' });
+                }
+                if ($scope.inscricao.TelefoneResponsavel) {
+                    if ($scope.inscricao.TelefoneResponsavel.length != 11 && ($scope.inscricao.TelefoneResponsavel.substr(2, 1) == 8 || $scope.inscricao.TelefoneResponsavel.substr(2, 1) == 9)) {
+                        validacao.push({ Grupo: 3, Para: 'TelefoneResponsavel', Descricao: 'Digite o celular do responsável com 11 números.' });
+                    }
+                }
+                //Estilo rádio.
+                if ($scope.pesquisas.findAll('Selecionado', true).length == 0) {
+                    validacao.push({ Grupo: 3, Para: 'Pesquisa', Descricao: 'Selecione o meio pelo qual conheceu o Inatel.' });
+                }
+            }
+
+            return validacao;
+        };
+
+        $scope.voltarPaginaInscricaoVestibular = function () {
+            $scope.informacoes = null;
+            if ($scope.Pagina > 1) { $scope.Pagina = $scope.Pagina - 1; }
+        }
+
+        $scope.voltarProHomePrincipal = function () {
+            window.location.href = "/GestaoIngressante";
+        };
+
+        $scope.voltarProPainelDeControle = function () {
+            window.location.href = "../vestibular/Inscricao?inscricao=" + $scope.inscricao.GUID;
+        };
+
+        function Calcular_Idade(dataNascimento) {
+            var hoje = new Date();
+
+            var dataSplit = dataNascimento.split('/');
+            nascimento = new Date(dataSplit[2], dataSplit[1] - 1, dataSplit[0]); //- 1 pq em js é de 0 a 11 os meses. O nº 0 representa Janeiro e o 11 Dezembro. 
+
+            var diferencaAnos = hoje.getFullYear() - nascimento.getFullYear();
+
+            if (new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()) <
+                new Date(hoje.getFullYear(), nascimento.getMonth(), nascimento.getDate()))
+                diferencaAnos--;
+
+            return diferencaAnos;
+        }
+
+        function getMaiorOpcaoSelecionada() {
+            var maiorOpcaoSelecionada = 0;
+            for (var I = 0; I < $scope.cursos.length; ++I) {
+                var opcao = $scope.cursos[I].OpcaoSelecionada | 0;
+                if (opcao > maiorOpcaoSelecionada) {
+                    maiorOpcaoSelecionada = opcao;
+                }
+            }
+            return maiorOpcaoSelecionada;
+        };
+
+        function getOpcoesCursos(limparCursos) {
+            var maiorOpcaoSelecionada = getMaiorOpcaoSelecionada();
+
+            $scope.opcoes.clear();
+            $scope.opcoes.push({ Numero: (maiorOpcaoSelecionada + 1), Opcao: (maiorOpcaoSelecionada + 1) + 'º opção' });
+            $scope.opcoes.push({ Numero: 0, Opcao: 'Não quero' });
+
+            var cursosNaoSelecionados = $scope.cursos.findAll('OpcaoSelecionada', -1);
+            for (var I = 0; I < cursosNaoSelecionados.length; ++I) {
+                var opcoes = cursosNaoSelecionados[I].Opcoes;
+                opcoes.clear();
+                for (var Y = 0; Y < $scope.opcoes.length; ++Y) {
+                    var opcao = $scope.opcoes[Y];
+                    opcoes.push({
+                        Opcao: opcao.Opcao,
+                        Numero: opcao.Numero
+                    });
+                }
+            }
+        };
+
+    }]);

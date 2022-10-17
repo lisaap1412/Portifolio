@@ -1,0 +1,16 @@
+﻿app.controller('GraduacaoController', ['$rootScope', '$scope', '$location', 'GraduacaoService', 'CloakService', '$window',
+function ($rootScope, $scope, $location, GraduacaoService, CloakService, $window) {
+
+    $scope.IniciarPaginaInscricaoGraduacao = function () {
+        $scope.BuscarDadosFormulario();
+    };
+
+    $scope.BuscarDadosFormulario = function () {
+        GraduacaoService.GetDadosCandidato().then(function (result) {
+            $scope.NomeUsuario = result.Data.Nome;
+        },
+        function (error) {
+            alert(error);
+        });
+    }
+}]);

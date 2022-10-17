@@ -1,0 +1,105 @@
+﻿app.factory('FichaSocialService', ['$q', 'HttpService', '$location', function ($q, HttpService, $location) {
+
+    return {
+
+        GetFichaSocial: function (fichaSocial) {
+            return HttpService.get(urlServico.GetFichaSocial, { GuidFichaSocial:fichaSocial});
+        },
+
+        GetMembrosFamilia: function (HandleFichaSocial) {
+            return HttpService.get(urlServico.GetMembrosFamilia, { GuidFichaSocial: HandleFichaSocial });
+        },
+
+        GetMembroFamiliaSelecionado: function (guid) {
+            return HttpService.get(urlServico.GetMembroFamiliaSelecionado, { GuidMembroFamiliar: guid });
+        },
+
+        GetGrausParentesco: function () {
+            return HttpService.get(urlServico.GetGrausParentesco);
+        },
+
+        validarNovoRegistro: function (nome,cpf) {
+            var deferred = $q.defer();
+
+            if (!nome) {
+                deferred.reject("O campo 'Nome' é obrigatório.");
+            } else {
+                if (!cpf) {
+                    deferred.reject("O campo 'CPF' é obrigatório.");
+                } else {
+                    deferred.resolve();
+                }
+            }
+            return deferred.promise;
+        },
+
+        RemoverMembroFamiliar: function (guidFichaSocial, guidMembroFamiliar) {
+            return HttpService.post(urlServico.RemoverMembroFamiliar, {
+                GuidFichaSocial: guidFichaSocial,
+                GuidMembroFamiliar: guidMembroFamiliar
+            });
+        },
+
+        SalvarFichaSocial: function (FichaSocial, Tipo) {
+            return HttpService.post(urlServico.SalvarFichaSocial, {
+                FichaSocial: FichaSocial,
+                Tipo: Tipo
+            });
+        },
+
+        SalvarMembroFamiliar: function (FichaSocial, MembroFamiliar, Tipo) {
+            return HttpService.post(urlServico.SalvarMembroFamiliar, {
+                FichaSocial: FichaSocial,
+                MembroFamiliar: MembroFamiliar,
+                Tipo: Tipo
+            });
+        },
+
+        GetDocumentacaoInscricao: function (tipoOrdenacao) {
+            return HttpService.get(urlServico.GetDocumentacaoInscricao, { tipoOrdenacao: tipoOrdenacao });
+        },
+
+        GetDocumentosEnviadosFichaSocialLogada: function (guidFichaSocial) {
+            return HttpService.get(urlServico.GetDocumentosEnviadosFichaSocialLogada, {
+                GuidFichaSocial: guidFichaSocial
+            });
+        },
+
+        GetNumArquivosTipoDocumento: function (guidFichaSocial,NomeDocumento) {
+            return HttpService.get(urlServico.GetNumArquivosTipoDocumento, { GuidFichaSocial: guidFichaSocial, NomeDocumento: NomeDocumento });
+        },
+
+  
+        CriarFichaSocial: function (anNome, anCPF) {
+            return HttpService.post(urlServico.CriarFichaSocial, { Nome: anNome, CPF: anCPF });
+        },
+
+        RemoverArquivo: function (guidFichaSocial,HandleArquivoDigital) {
+            return HttpService.post(urlServico.RemoverArquivo, { GuidFichaSocial:guidFichaSocial,HandleArquivoDigital: HandleArquivoDigital });
+        },
+
+        DesfazerStatusFichaSocial: function (FichaSocial) {
+            return HttpService.post(urlServico.DesfazerStatusFichaSocial, {
+                FichaSocial: FichaSocial
+            });
+        },
+
+        GetInscricaoProcessoSeletivo: function (CPF) {
+            return HttpService.get(urlServico.GetInscricaoProcessoSeletivo, { CPF: CPF });
+        },
+
+        AtualizarUsarFichaSocialProcessoSeletivo: function (HandleInscricaoProcessoSeletivo) {
+            return HttpService.post(urlServico.AtualizarUsarFichaSocialProcessoSeletivo, {
+                HandleInscricaoProcessoSeletivo: HandleInscricaoProcessoSeletivo
+            });
+        },
+
+        GetFaixaBens: function () {
+            return HttpService.get(urlServico.GetFaixaBens);
+        },
+
+        GetProcessoSeletivoAtual: function () {
+            return HttpService.get(urlServico.GetProcessoSeletivoAtual);
+        },
+    };
+} ]);

@@ -1,0 +1,208 @@
+﻿app.factory('VestibularService', ['HttpService', function (HttpService) {
+
+    var service = {};
+
+    service.getBoletoPagamentoInscricao = function (inscricao) {
+        return HttpService.post(urlServico.GetBoletoPagamentoInscricao, {
+            inscricao: inscricao
+        });
+    };
+
+    service.getBoletoPagamentoMensalidade = function (resultado) {
+        return HttpService.post(urlServico.GetBoletoPagamentoMensalidade, {
+            resultado: resultado
+        });
+    };
+
+    service.getCidadesDoEstado = function (estado) {
+        return HttpService.get(urlServico.GetCidadesDoEstado, { estado: estado });
+    };
+
+    service.getCidadePorCEP = function (cep) {
+        return HttpService.get(urlServico.GetCidadePorCEP, { cep: cep });
+    };
+
+    service.getCidadePorCEPFinanceiro = function (cep) {
+        return HttpService.get(urlServico.GetCidadePorCEPFinanceiro, { cep: cep });
+    };
+
+    service.getCidadesDoEstadoFinanceiro = function (estado) {
+        return HttpService.get(urlServico.GetCidadesDoEstadoFinanceiro, { estado: estado });
+    };
+
+    service.getDadosAlteracoesCadastrais = function (inscricaoVestibular) {
+        return HttpService.get(urlServico.GetDadosAlteracoesCadastrais, {
+            inscricaoVestibular: inscricaoVestibular
+        });
+    };
+      
+    service.getDadosPessoaCorrente = function () {
+        return HttpService.get(urlServico.GetDadosPessoaCorrente);
+    };
+    
+    service.getDocumentosMatricula = function (inscricaoVestibular, faseMatricula) {
+        return HttpService.get(urlServico.GetDocumentosMatricula, { inscricaoVestibular: inscricaoVestibular, faseMatricula: faseMatricula });
+    };
+
+    service.getInformacoesInscricaoVestibular = function (processoInscricao) {
+        return HttpService.get(urlServico.GetInformacoesInscricaoVestibular, { processoInscricao: processoInscricao });
+    };
+
+    service.getInformacoesParaPagamento = function (inscricao) {
+        return HttpService.get(urlServico.GetInformacoesParaPagamento, { inscricao: inscricao });
+    };
+
+    service.getInformacoesResponsavelFinanceiro = function (numeroInscricao) {
+        return HttpService.get(urlServico.GetInformacoesResponsavelFinanceiro, { numeroInscricao: numeroInscricao });
+    };
+
+    service.getInscricoesVestibularAtivas = function () {
+        return HttpService.get(urlServico.GetInscricoesVestibularAtivas);
+    };
+
+    service.getLocaisAbertosInscricao = function () {
+        return HttpService.get(urlServico.GetLocaisAbertosInscricao, {}, null, false);
+    };
+
+    service.getLocalidadeListPorProcessoLocalidade = function (processoInscricao, localidadeInscricao) {
+        return HttpService.get(urlServico.GetLocalidadeListPorProcessoLocalidade, { processoInscricao: processoInscricao, localidadeInscricao: localidadeInscricao });
+    };
+
+    service.getMensagemInicioInscricao = function () {
+        return HttpService.get(urlServico.GetMensagemInicioInscricao, {}, null, false);
+    };
+
+    service.getProcessosAbertosPorLocalidade = function (localidadeInscricao) {
+        return HttpService.get(urlServico.GetProcessosAbertosPorLocalidade, { localidadeInscricao: localidadeInscricao });
+    };
+
+    service.getProcessosSeletivosAbertos = function () {
+        return HttpService.get(urlServico.GetProcessosSeletivosAbertos);
+    };
+
+    service.getResultadosProcessoSeletivo = function (inscricaoVestibular) {
+        return HttpService.get(urlServico.GetResultadosProcessoSeletivo, { inscricaoVestibular: inscricaoVestibular });
+    };
+    
+    service.getUsuarioVestibularPelaInscricao = function (numeroInscricao) {
+        return HttpService.get(urlServico.GetUsuarioVestibularPelaInscricao, { numeroInscricao: numeroInscricao });
+    };
+
+    service.pagarCartaoCredito = function (inscricaoVestibular, bandeira, beforeSend) {
+        return HttpService.post(urlServico.PagarComCartaoCredito, {
+            inscricaoVestibular: inscricaoVestibular, bandeira: bandeira
+        }, beforeSend);
+    };
+
+    service.salvarAlteracoesCadastrais = function (inscricao, cursos) {
+        inscricao.Cursos = cursos.findAllNot('OpcaoSelecionada', -1);
+        return HttpService.post(urlServico.SalvarAlteracoesCadastrais, { inscricao: inscricao });
+    };
+
+    service.salvarDadosMatricula = function (dadosMatricula, operacao) {
+        return HttpService.post(urlServico.SalvarDadosMatricula, { dadosMatricula: dadosMatricula, operacao: operacao });
+    };
+
+    service.salvarInscricaoVestibular = function (inscricao, cursos, pesquisas) {
+        inscricao.Cursos = cursos.findAllNot('OpcaoSelecionada', -1);
+        inscricao.Pesquisas = pesquisas.findAll('Selecionado', true);
+        return HttpService.post(urlServico.SalvarInscricaoVestibular, { inscricao: inscricao });
+    };
+        
+    service.validarAlteracoesCadastrais = function (inscricao) {
+        return HttpService.post(urlServico.ValidarAlteracoesCadastrais, {
+            documentoIdentidade: inscricao.DocumentoIdentidade,
+            processoSeletivo: inscricao.ProcessoSeletivo,
+            handleInscrito: inscricao.Handle
+        });
+    };
+
+    service.validarIdadeSegurado = function (responsavel) {
+        var validacao = [];
+
+        var nascimentoSegurado = "";
+        if ((responsavel.SeguradoEhContratante == false)) {
+            nascimentoSegurado = responsavel.SeguradoNascimento;
+        } else {
+            nascimentoSegurado = responsavel.DataNascimento;
+        }
+
+        var dataAtual = new Date();
+        var anoAtual = dataAtual.getFullYear();
+        //var dataNascParts = nascimentoSegurado.split("/");
+        //var diaNasc = dataNascParts[0];
+        //var mesNasc = dataNascParts[1];
+        //var anoNasc = dataNascParts[2];
+        //A data de nascimento está sendo armazenada como 080820020000:
+        var diaNasc = nascimentoSegurado.substr(0, 2);
+        var mesNasc = nascimentoSegurado.substr(2, 2);
+        var anoNasc = nascimentoSegurado.substr(4, 4);
+        var idade = anoAtual - anoNasc;
+        var mesAtual = dataAtual.getMonth() + 1;
+        //Se mês atual for menor do que o do nascimento, não fez aniversário ainda.
+        if (mesAtual < mesNasc) {
+            idade--;
+        } else {
+            //Se estiver no mês do nascimento, verificar o dia.
+            if (mesAtual == mesNasc) {
+                if (dataAtual.getDate() < diaNasc) {
+                    //Se data atual for menor do que o dia de nascimento, não fez aniversário ainda.
+                    idade--;
+                }
+            }
+        }
+
+        if (idade > 65) {
+            var textoValidacao = "Uma das condições para indicação do segurado, é que o mesmo não poderá ter mais de 65 (sessenta e cinco) anos de idade. O segurado informado, possui idade superior a este limite e, por isso, será necessária a indicação de outra pessoa.";
+            if ((responsavel.SeguradoEhContratante == false)) {
+                validacao.push({ Grupo: 4, Para: 'SeguradoNascimento', Descricao: textoValidacao });
+            } else {
+                validacao.push({ Grupo: 2, Para: 'DataNascimento', Descricao: textoValidacao });
+            }
+        }
+
+        return validacao;
+    };
+
+    service.validarInscricaoCpfEmail = function (inscricao) {
+        return HttpService.post(urlServico.ValidarInscricaoCpfEmail, {
+               email: inscricao.Email,
+               cpf: inscricao.CPF,
+               processoSeletivo: inscricao.ProcessoSeletivo == null ? 0 : inscricao.ProcessoSeletivo
+        });
+    };
+
+    service.validarInscricaoPagina2 = function (inscricao) {
+        return HttpService.post(urlServico.ValidarInscricaoPagina2, {
+            dataNascimento: inscricao.DataNascimento,
+            documentoIdentidade: inscricao.DocumentoIdentidade,
+            CPF: inscricao.CPF,
+            processoSeletivo: inscricao.ProcessoSeletivo
+        });
+    };
+
+    service.validarInscricaoPagina3 = function (inscricao) {
+        return HttpService.post(urlServico.ValidarInscricaoPagina3, {
+            emailResponsavel: inscricao.EmailResponsavel
+        });
+    };
+
+    service.validarMatriculaPagina1 = function (responsavel) {
+        return HttpService.post(urlServico.ValidarMatriculaPagina1, {
+            emailResponsavel: responsavel.ResponsavelEmail
+        });
+    };
+
+    service.validarMatriculaPagina2 = function (responsavel) {
+        return HttpService.post(urlServico.ValidarMatriculaPagina2, {
+            dataNascimento: responsavel.DataNascimento,
+            cpf: responsavel.CPF,
+            emailResponsavel: responsavel.Email,
+            seguradoNascimento: responsavel.SeguradoNascimento,
+            seguradoCPF: responsavel.SeguradoCPF,
+            seguradoEmail: responsavel.SeguradoEmail
+        });
+    };
+
+    return service;
+}]);

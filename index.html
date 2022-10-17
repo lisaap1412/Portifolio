@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="./src/css/reset.css">
+    <link rel="stylesheet" href="./src/css/estilos.css">
+    <link rel="stylesheet" href="./src/css/rolagem.css">
+
+    <title>Portfólio</title>
+  </head>
+  <body>
+    <main class="cartao">
+      <div class="minhas-informacoes">
+        <img src="./src/imagens/foto-perfil.jpg" alt="foto de perfil" width="120"/>
+        <h1 class="nome">Ana Elisa Ap. de Oliveira</h1>
+        <h2 class="cargo">Desenvolvedora Frontend Júnior</h2>
+      </div>
+
+      <div class="conteudo">
+        <ul class="abas">
+          <li class="aba selecionado" id="sobre-mim">
+            <img src="./src/imagens/sobree.png" alt="ícone de sobre mim" />
+          </li>
+          <li class="aba" id="minhas-redes">
+            <img src="./src/imagens/coracao.gif" alt="ícone de redes sociais" />
+          </li>
+        </ul>
+
+        <div class="informacoes-abas">
+          <div class="informacao selecionado" id="informacao-sobre-mim">
+            <h3 class="sub-titulo">Sobre</h3>
+
+            <div class="descricao">
+              <p>Oi! meu nome é Ana Elisa, seja bem-vindo(a)!</p>
+
+              <p>
+                Sou uma pessoa apaixonada por aprender coisas novas,
+                até que um dia eu conheci a programação e me encantei por ela.
+                Depois disto acabei tendo o sonho de trabalhar com programação e
+                atualmente comecei a colocar esse sonho em prática estudando
+                <span>HTML, CSS, JavaScript e C#</span>. Gosto muito de desenhar (até demais), e meus
+                principais hobbies são jogar, ver animes, ver filmes, dançar e ver séries.
+              </p>
+            </div>
+          </div>
+
+          <div class="informacao" id="informacao-minhas-redes">
+            <h3 class="sub-titulo">Minhas redes</h3>
+
+            <ul class="redes-sociais">
+                <li>
+                    <a href="https://www.canva.com/design/DAFPVeegOUU/GfiGGUqSb7mGa19oovvqCA/view?utm_content=DAFPVeegOUU&utm_campaign=designshare&utm_medium=link&utm_source=publishsharelink" target="_blank" class="curriculo">Currículo</a>
+                </li>
+                <li>
+                    <a href="https://www.linkedin.com/in/ana-elisa-aparecida-1753b0240/" target="_blank" class="linkedin">LinkedIn</a>
+                </li>
+                <li>
+                    <a href="https://github.com/lisaap1412" target="_blank" class="github">GitHub</a>
+                </li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <script src="./src/js/index.js"></script>
+  </body>
+</html>

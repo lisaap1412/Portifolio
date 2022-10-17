@@ -1,0 +1,10 @@
+﻿app.factory('GraduacaoService', ['$q', 'HttpService', '$location', function ($q, HttpService, $location) {
+
+    return {
+
+        GetDadosCandidato: function () {
+            return HttpService.get(urlServico.GetDadosCandidatoGraduacao);
+        },
+
+    };
+}]);

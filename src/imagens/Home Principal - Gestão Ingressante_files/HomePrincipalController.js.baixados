@@ -1,0 +1,23 @@
+﻿app.controller('HomePrincipalController', ['$rootScope', '$scope', 'HomeService',  
+    function ($rootScope, $scope, HomeService) {
+
+    $scope.InicializarPagina = function () {
+        if (window.Model != null) {
+            $scope.Nome = window.Model.Nome;
+            $scope.Email = window.Model.Email;
+
+            //Busca Inscrições Ativas do Vestibular.
+            HomeService.GetDadosHomePrincipal().then(function (result) {
+                $scope.inscricoesAtivas = result.Data.InscricoesVestibular;
+                $scope.fichasSociaisAtivas = result.Data.FichasSociaisAtivas;
+
+            });
+        }
+    };
+
+    //$scope.goToPaginaInicialVestibular = function (inscricao) {
+    //    window.location.href = "/GestaoIngressante/Vestibular/Inscricao?inscricao=" + inscricao;
+    //}
+
+}]);
+

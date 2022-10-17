@@ -1,0 +1,63 @@
+﻿app.controller('PagamentoVestibularController', ['$scope', 'VestibularService', function ($scope, VestibularService) {
+
+    $scope.getInformacoesParaPagamento = function () {
+        VestibularService.getInformacoesParaPagamento(data.inscricao).then(function (result) {
+            if (result.Success) {
+                $scope.informacoesPagamento = result.Data;
+            } else {
+                if (result.ErrorMessage) {
+                    alert(result.ErrorMessage);
+                }
+            }
+        });
+    }
+
+    $scope.geraBoletoPagamentoInscricao = function () {
+        VestibularService.getBoletoPagamentoInscricao(data.inscricao).then(function (result) {
+            $scope.resultados = result.Data.Resultados;
+        }, function (error) {
+            console.log(error);
+        });
+    }
+
+    $scope.geraBoletoPagamentoMensalidade = function () {
+        VestibularService.getBoletoPagamentoMensalidade(data.resultado).then(function (result) {
+            $scope.resultados = result.Data.Resultados;
+        }, function (error) {
+            console.log(error); 
+        });
+    }
+
+    $scope.desabilitarPagamentoBoleto = function () {
+        if ($scope.informacoesPagamento == undefined) {
+            return true;
+        } else {
+            if ($scope.informacoesPagamento.Cpf == "") { return true } else { return false };
+        }
+    };
+
+    $scope.desabilitarPagamentoCartaoCredito = function () {
+        return !$scope.bandeiraSelecionada;
+
+        //Retirado do ar o pagamento de inscrição através do Cielo, em 02/07/2018, a pedido da Juliana e Mirella, até o acerto de problemas pelo fornecedor. 
+        //return true;
+    };
+
+    $scope.selecionarBandeiraCartaoCredito = function (bandeira) {
+        $scope.bandeiraSelecionada = bandeira;
+    };
+
+    $scope.pagarCartaoCredito = function () {
+        VestibularService.pagarCartaoCredito(
+            $scope.informacoesPagamento.InscricaoVestibular, $scope.bandeiraSelecionada, function () {
+                $scope.processandoPagamento = true;
+                $scope.mensagemPagamento = 'Carregando. Aguarde um momento...';
+            }).then(function (result) {
+                $('#modalContinuarPagamento').modal('show');
+                $scope.mensagemPagamento = null;
+                $scope.processandoPagamento = false;
+                console.log(result.Data);
+                $scope.urlAutenticacao = result.RedirectTo;
+            });
+    };
+}]);

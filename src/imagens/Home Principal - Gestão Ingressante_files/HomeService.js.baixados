@@ -1,0 +1,10 @@
+﻿app.factory('HomeService', ['$q', 'HttpService', '$location', function ($q, HttpService, $location) {
+
+    return {
+
+        GetDadosHomePrincipal: function () {
+            return HttpService.get(urlServico.GetDadosHomePrincipal);
+        },
+
+    };
+}]);

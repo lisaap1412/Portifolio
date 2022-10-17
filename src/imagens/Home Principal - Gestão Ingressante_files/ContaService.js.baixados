@@ -1,0 +1,69 @@
+﻿app.factory('ContaService', ['$q', 'HttpService', '$location', function ($q, HttpService, $location) {
+
+    return {
+
+
+        initPaginaLogin: function () {
+            return HttpService.get(urlServico.InitPaginaLogin);
+        },
+
+        GetDadosPerfil: function () {
+            return HttpService.get(urlServico.GetDadosPerfil);
+        },
+
+
+        validarEnvioSenha: function (cpf, datanascimento) {
+            var deferred = $q.defer();
+
+            if (!cpf) {
+                deferred.reject("O campo 'CPF' é obrigatório.");
+            } else {
+                if (!datanascimento) {
+                    deferred.reject("O campo 'Data de Nascimento' é obrigatório.");
+                } else {
+                    deferred.resolve();
+                }
+            }
+            return deferred.promise;
+        },
+
+        validarAlteracaoSenha: function (AntigaSenha, NovaSenha, ConfirmacaoSenha) {
+            var deferred = $q.defer();
+
+            if (!AntigaSenha) {
+                deferred.reject("O campo 'Antiga Senha' é obrigatório.");
+            } else {
+                if (!NovaSenha) {
+                    deferred.reject("O campo 'Nova Senha' é obrigatório.");
+                } else {
+                    if (!ConfirmacaoSenha) {
+                        deferred.reject("O campo 'Confirmação de Senha' é obrigatório.");
+                    } else { }
+                    deferred.resolve();
+                }
+            }
+            return deferred.promise;
+        },
+
+        EnviarSenhaPorEmail: function (cpf, datanascimento, TipoConta) {
+            return HttpService.post(urlServico.EnviarSenhaPorEmail, { anCPF: cpf, anDatanascimento: datanascimento, anTipoConta: TipoConta });
+        },
+        VerificarAutorizacaoAcesso: function (token) {
+            return HttpService.post(urlServico.VerificarAutorizacaoAcesso, { token: token });
+        },
+        
+
+        EnviarAutorizacaoAcesso: function (email) {
+            return HttpService.post(urlServico.EnviarAutorizacaoAcesso, { anEmail: email });
+        },
+
+        EnviarAutorizacaoAcessoEmail: function (token) {
+            return HttpService.post(urlServico.EnviarAutorizacaoAcessoEmail, { token: token });
+        },
+
+        AlteracaoSenhaSistema: function (Email, AntigaSenha, NovaSenha, ConfirmacaoSenha) {
+            return HttpService.post(urlServico.AlteracaoSenhaSistema, { anEmail: Email, anAntigaSenha: AntigaSenha, anNovaSenha: NovaSenha, anConfirmacaoSenha: ConfirmacaoSenha });
+        },
+
+    };
+} ]);

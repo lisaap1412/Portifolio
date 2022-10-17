@@ -1,0 +1,31 @@
+﻿app.factory('SegurancaService', ['$q', 'HttpService', function ($q, HttpService) {
+
+    return {
+
+        GetListarUsuariosTodasRegras: function () {
+            return HttpService.get(urlServico.GetListarUsuariosTodasRegras);
+        },
+
+        GetListarUsuariosSeguranca: function () {
+            return HttpService.get(urlServico.GetListarUsuariosSeguranca);
+        },
+
+        GetInformacoesUsuario: function (anUsuario) {
+            return HttpService.get(urlServico.GetInformacoesUsuario, { anUsuario:anUsuario });
+        },
+
+        AlterarRegraUsuario: function (anUsuario, anRegra, anAcao) {
+            return HttpService.post(urlServico.AlterarRegraUsuario,
+                {
+                    anUsuario: anUsuario,
+                    anRegra: anRegra,
+                    anAcao: anAcao
+                });
+        },
+
+        SalvarLogarComo: function (model) {
+            return HttpService.post(urlServico.SalvarLogarComo, { model: model });
+        },
+
+    };
+} ]);
